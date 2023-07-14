@@ -145,6 +145,9 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
 		}
 	}
 
+// load init robot pose
+	m_init_robot_pose = GetCurrRobotPose();
+
 	// Set markers
 
 	m_prev_frontier_set = set<pointset>();
@@ -701,8 +704,11 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 		return;
 	}
 
-	mn_roi_origx = mn_globalmap_centx ; // - (int)round( m_gridmap.info.origin.position.x / m_fResolution ) ;
-	mn_roi_origy = mn_globalmap_centy ; //- (int)round( m_gridmap.info.origin.position.y / m_fResolution ) ;
+	// set the cent of the map as the init robot position (x, y)
+	cv::Point Offset = compute_rpose_wrt_maporig() ;
+
+	mn_roi_origx = mn_globalmap_centx - Offset.x; // - (int)round( m_gridmap.info.origin.position.x / m_fResolution ) ;
+	mn_roi_origy = mn_globalmap_centy - Offset.y; //- (int)round( m_gridmap.info.origin.position.y / m_fResolution ) ;
 	cv::Rect roi( mn_roi_origx, mn_roi_origy, gmwidth, gmheight );
 
 	mcvu_mapimgroi = mcvu_mapimg(roi);
@@ -751,8 +757,12 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	}
 	clusterToThreeLabels( img_ );
 
-// We need to zero-pad around img b/c m_gridmap dynamically increases
-// u = unk padding (offset), x = orig img contents
+/*******************************************************************************************************************************************
+ We need to zero-pad around img b/c m_gridmap dynamically increases
+ u = unk padding (offset), x = orig img contents
+ Note that this padding has nothing to do with the extra canvas size allocated in mcv_mapimg... The reason for large mcv_mapimg is to standardize the full map size (perhaps for DL tranning)
+ while ROI_OFFSET ensures FFP search begins from an UNKNOWN cell. That is FFP scans on the ROI (including the ROI_OFFSET region) of mcv_mapimg
+*********************************************************************************************************************************************/
 
 // u u u u u u u u
 // u x x x x x x u
@@ -1272,6 +1282,8 @@ ROS_DEBUG("\n "
 
 ROS_INFO("********** \t End of mapdata callback routine \t ********** \n");
 
+	saveDNNData( img_frontiers_offset, start, best_goal, ROI_OFFSET, roi ) ;
+
 // for timing
 mn_mapcallcnt++;
 mf_totalcallbacktime_msec = mf_totalcallbacktime_msec + mapcallback_time + planning_time ;
@@ -1280,9 +1292,33 @@ mf_totalplanningtime_msec = mf_totalplanningtime_msec + planning_time ;
 }
 
 
-void FrontierDetectorDMS::gobalPlanCallback(const visualization_msgs::Marker::ConstPtr& msg)
+void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal, const int& OFFSET, const cv::Rect& roi )
 {
+//	string strgmapimg 	= (boost::format("%s/mapimg%05d.png") % m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
+//	string strmetadata 	= (boost::format("%s/metadata%05d.txt") % m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
+//	string strimgFR		= (boost::format("%s/imgfr%05.txt") %  m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
 
+	char cgmapimg[300], cmetadata[300], cimgFR[300];
+	sprintf(cgmapimg,	"%s/mapimg%04d.png",m_str_debugpath.c_str(),mn_mapcallcnt);
+	sprintf(cmetadata,	"%s/metadata%04d.txt",m_str_debugpath.c_str(),mn_mapcallcnt);
+	sprintf(cimgFR,		"%s/frimg%04d.png",m_str_debugpath.c_str(),mn_mapcallcnt);
+
+	// save gridmap
+	cv::imwrite( string(cgmapimg), mcvu_mapimg ) ;
+
+	// save metadata (robot pose, opt frontier point, )
+	std::ofstream ofs_metadata( cmetadata );
+	ofs_metadata <<
+			start.pose.position.x << " " << start.pose.position.y << " " <<
+			start.pose.orientation.x << " " <<	start.pose.orientation.y << " " << start.pose.orientation.z << " " << start.pose.orientation.w << " " <<
+			best_goal.pose.position.x << " " << best_goal.pose.position.y << " " <<
+			m_gridmap.info.height << " " << m_gridmap.info.width << " " << m_gridmap.info.origin.position.x << " " << m_gridmap.info.origin.position.y << " " << m_gridmap.info.resolution << " " <<
+			OFFSET << " " << roi.x << " " << roi.y << " " << roi.height << " " << roi.width << endl;
+
+	ofs_metadata.close();
+
+	// save frontier region
+	cv::imwrite( string(cimgFR), img_frontiers_offset );
 }
 
 

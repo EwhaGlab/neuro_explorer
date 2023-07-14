@@ -55,6 +55,7 @@ EMail:       kimy@ewha.ac.kr
 #include <random>
 #include <unordered_set>
 #include <boost/format.hpp>
+#include <fstream>
 
 //#define OCCUPANCY_THR (60)
 //#define DEBUG_MODE
@@ -131,6 +132,18 @@ public:
 	int selectNextBestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  ) ;
 	int selectEscapingPoint( geometry_msgs::PoseStamped& escapepoint) ;
 	int moveBackWard() ;
+
+	// save DNN data sets for DNN
+	void saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal, const int& OFFSET, const cv::Rect& roi );
+
+	cv::Point compute_rpose_wrt_maporig( )
+	{
+		float frx_w = m_init_robot_pose.pose.position.x ;
+		float fry_w = m_init_robot_pose.pose.position.y ;
+		float fox_w = m_gridmap.info.origin.position.x ;
+		float foy_w = m_gridmap.info.origin.position.y ;
+		return world2gridmap( cv::Point2f( frx_w, fry_w ) ) ;
+	}
 
 	geometry_msgs::PoseStamped GetCurrRobotPose ( )
 	{
@@ -280,6 +293,7 @@ protected:
 	bool mb_nbv_selected ;
 	ros::Time m_last_oscillation_reset ;
 	geometry_msgs::PoseStamped m_previous_robot_pose ;
+	geometry_msgs::PoseStamped m_init_robot_pose ;
 
 private:
 	std::mutex mutex_robot_state;
@@ -296,7 +310,7 @@ private:
 	omp_lock_t m_mplock;
 
 	// for debug
-	int mn_mapcallcnt ;
+	int mn_mapcallcnt, mn_mapdatacnt ;
 	double mf_avgcallbacktime_msec, mf_avgplanngtime_msec, mf_totalcallbacktime_msec, mf_totalplanningtime_msec ;
 };
 
