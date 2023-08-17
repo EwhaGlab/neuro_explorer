@@ -107,6 +107,7 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
 	m_makeplan_client = m_nh.serviceClient<nav_msgs::GetPlan>("move_base/make_plan");
 
 	mcvu_mapimg  	  = cv::Mat(mn_globalmap_height, mn_globalmap_width, CV_8U, cv::Scalar(127));
+	mcvu_costmapimg   = cv::Mat(mn_globalmap_height, mn_globalmap_width, CV_8U, cv::Scalar(255));
 
 	int ncostmap_roi_size = mn_roi_size ; // / 2 ;
 	int ngridmap_roi_size = mn_roi_size ;
@@ -711,7 +712,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	mn_roi_origy = mn_globalmap_centy - Offset.y; //- (int)round( m_gridmap.info.origin.position.y / m_fResolution ) ;
 	cv::Rect roi( mn_roi_origx, mn_roi_origy, gmwidth, gmheight );
 
-	mcvu_mapimgroi = mcvu_mapimg(roi);
+	//mcvu_mapimgroi = mcvu_mapimg(roi);
 
 	for( int ii =0 ; ii < gmheight; ii++)
 	{
@@ -736,6 +737,19 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 			}
 		}
 	}
+
+// process costmap
+	for( int ii =0 ; ii < cmheight; ii++)
+	{
+		for( int jj = 0; jj < cmwidth; jj++)
+		{
+			int8_t val  = globalcostmap.data[ ii * cmwidth + jj] ;
+			int y_ = (mn_roi_origy + ii) ;
+			int x_ = (mn_roi_origx + jj) ;
+			mcvu_costmapimg.data[ y_ * mn_globalmap_width + x_ ] = 	val < 0 ? 255 : mp_cost_translation_table[val];
+		}
+	}
+
 
 // The robot is not moving (or ready to move)... we can go ahead plan the next action...
 // i.e.) We locate frontier points again, followed by publishing the new goal
@@ -1298,14 +1312,17 @@ void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, cons
 //	string strmetadata 	= (boost::format("%s/metadata%05d.txt") % m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
 //	string strimgFR		= (boost::format("%s/imgfr%05.txt") %  m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
 
-	char cgmapimg[300], cmetadata[300], cimgFR[300];
-	sprintf(cgmapimg,	"%s/mapimg%04d.png",m_str_debugpath.c_str(),mn_mapcallcnt);
-	sprintf(cmetadata,	"%s/metadata%04d.txt",m_str_debugpath.c_str(),mn_mapcallcnt);
-	sprintf(cimgFR,		"%s/frimg%04d.png",m_str_debugpath.c_str(),mn_mapcallcnt);
+	char cgmapimg[300], ccmimg[300], cmetadata[300], cimgFR[300];
+	sprintf(cgmapimg,	"%s/gmimg%04d.png", m_str_debugpath.c_str(),mn_mapcallcnt);
+	sprintf(ccmimg, "%s/cmimg%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt );
+	sprintf(cmetadata,	"%s/metadata%04d.txt", m_str_debugpath.c_str(),mn_mapcallcnt);
+	sprintf(cimgFR,		"%s/frimg%04d.png", m_str_debugpath.c_str(),mn_mapcallcnt);
 
-	// save gridmap
+	// save gridmap and costmap
+	unsigned char* pmap = mpo_costmap->getCharMap() ;
+	cv::Mat cvcmapimg = cv::Mat( mcvu_mapimg.rows, mcvu_mapimg.cols, CV_8U);
 	cv::imwrite( string(cgmapimg), mcvu_mapimg ) ;
-
+	cv::imwrite( string(ccmimg), mcvu_costmapimg) ;
 	// save metadata (robot pose, opt frontier point, )
 	std::ofstream ofs_metadata( cmetadata );
 	ofs_metadata <<

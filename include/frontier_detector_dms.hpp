@@ -271,7 +271,7 @@ protected:
 	string mstr_inputparams ;
 	bool mb_isinitmotion_completed ;
 
-	cv::Mat mcvu_mapimg, mcvu_mapimgroi ;
+	cv::Mat mcvu_mapimg, mcvu_costmapimg, mcvu_mapimgroi ;
 
 	FrontierFilter mo_frontierfilter;
 	tf::TransformListener m_listener;
