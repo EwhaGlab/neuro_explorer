@@ -134,7 +134,8 @@ public:
 	int moveBackWard() ;
 
 	// save DNN data sets for DNN
-	void saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal, const int& OFFSET, const cv::Rect& roi );
+	void saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal,
+						const std::vector<geometry_msgs::PoseStamped>& best_plan, const int& OFFSET, const cv::Rect& roi );
 
 	cv::Point compute_rpose_wrt_maporig( )
 	{

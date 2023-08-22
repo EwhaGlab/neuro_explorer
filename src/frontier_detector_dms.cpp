@@ -684,6 +684,13 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 		gmstarty = m_gridmap.info.origin.position.y ;
 	}
 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	// there is a minor bug here!!
+	// the costmap and gridmap could be different even if they are the same sized.
+	// costmap is a bit lagging behind the gridmap !!! This is a minor bug for AE, but a serious bug if we want to feed both Gmap and Cmap for training DNN !!!
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	// TODO: I need to eliminate gridmap ... I should only use costmap to find FFP and do A* search
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	{
 		const std::unique_lock<mutex> lock(mutex_costmap);
 		globalcostmap = m_globalcostmap;
@@ -1092,6 +1099,7 @@ ROS_INFO(" innner seed (%d %d)  map size: (%d %d)\n", ngmx, ngmy, img_plus_offse
 
 	GlobalPlanningHandler o_gph( *mpo_costmap, m_worldFrameId, m_baseFrameId, mb_allow_unknown );
 	std::vector<geometry_msgs::PoseStamped> plan;
+	std::vector<geometry_msgs::PoseStamped> best_plan;
 	uint32_t fptidx;
 	int tid;
 	geometry_msgs::PoseStamped goal;
@@ -1145,6 +1153,7 @@ ros::WallTime GPstartTime = ros::WallTime::now();
 				omp_set_lock(&m_mplock);
 				fupperbound = fendpot; // set new bound;
 				best_idx = fptidx;
+				best_plan = plan;
 				omp_unset_lock(&m_mplock);
 			}
 		}
@@ -1296,7 +1305,7 @@ ROS_DEBUG("\n "
 
 ROS_INFO("********** \t End of mapdata callback routine \t ********** \n");
 
-	saveDNNData( img_frontiers_offset, start, best_goal, ROI_OFFSET, roi ) ;
+	saveDNNData( img_frontiers_offset, start, best_goal, best_plan, ROI_OFFSET, roi ) ;
 
 // for timing
 mn_mapcallcnt++;
@@ -1306,17 +1315,19 @@ mf_totalplanningtime_msec = mf_totalplanningtime_msec + planning_time ;
 }
 
 
-void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal, const int& OFFSET, const cv::Rect& roi )
+void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal,
+								const std::vector<geometry_msgs::PoseStamped>& best_plan, const int& OFFSET, const cv::Rect& roi )
 {
 //	string strgmapimg 	= (boost::format("%s/mapimg%05d.png") % m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
 //	string strmetadata 	= (boost::format("%s/metadata%05d.txt") % m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
 //	string strimgFR		= (boost::format("%s/imgfr%05.txt") %  m_str_debugpath.c_str() % mn_mapcallcnt ).str() ;
 
-	char cgmapimg[300], ccmimg[300], cmetadata[300], cimgFR[300];
+	char cgmapimg[300], ccmimg[300], cmetadata[300], cimgFR[300], cbestplan[300];
 	sprintf(cgmapimg,	"%s/gmimg%04d.png", m_str_debugpath.c_str(),mn_mapcallcnt);
-	sprintf(ccmimg, "%s/cmimg%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt );
+	sprintf(ccmimg, 	"%s/cmimg%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt );
 	sprintf(cmetadata,	"%s/metadata%04d.txt", m_str_debugpath.c_str(),mn_mapcallcnt);
 	sprintf(cimgFR,		"%s/frimg%04d.png", m_str_debugpath.c_str(),mn_mapcallcnt);
+	sprintf(cbestplan,	"%s/bestplan%04d.txt", m_str_debugpath.c_str(), mn_mapcallcnt);
 
 	// save gridmap and costmap
 	unsigned char* pmap = mpo_costmap->getCharMap() ;
@@ -1333,9 +1344,13 @@ void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, cons
 			OFFSET << " " << roi.x << " " << roi.y << " " << roi.height << " " << roi.width << endl;
 
 	ofs_metadata.close();
-
 	// save frontier region
 	cv::imwrite( string(cimgFR), img_frontiers_offset );
+
+	std::ofstream ofs_bestplan( cbestplan );
+	for (int nidx=0; nidx < best_plan.size(); nidx++)
+		ofs_bestplan << best_plan[nidx].pose.position.x << " " << best_plan[nidx].pose.position.y << endl;
+	ofs_bestplan.close();
 }
 
 
