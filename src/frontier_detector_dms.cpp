@@ -689,7 +689,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	// the costmap and gridmap could be different even if they are the same sized.
 	// costmap is a bit lagging behind the gridmap !!! This is a minor bug for AE, but a serious bug if we want to feed both Gmap and Cmap for training DNN !!!
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
-	// TODO: I need to eliminate gridmap ... I should only use costmap to find FFP and do A* search
+	// TODO 1: I need to eliminate gridmap ... I should only use costmap to find FFP and do A* search
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	{
 		const std::unique_lock<mutex> lock(mutex_costmap);
