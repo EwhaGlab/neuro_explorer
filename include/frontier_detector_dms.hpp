@@ -141,8 +141,6 @@ public:
 	{
 		float frx_w = m_init_robot_pose.pose.position.x ;
 		float fry_w = m_init_robot_pose.pose.position.y ;
-		float fox_w = m_gridmap.info.origin.position.x ;
-		float foy_w = m_gridmap.info.origin.position.y ;
 		return world2gridmap( cv::Point2f( frx_w, fry_w ) ) ;
 	}
 

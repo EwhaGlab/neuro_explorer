@@ -713,7 +713,8 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	}
 
 	// set the cent of the map as the init robot position (x, y)
-	cv::Point Offset = compute_rpose_wrt_maporig() ;
+	//cv::Point Offset = compute_rpose_wrt_maporig() ;
+	cv::Point Offset = world2gridmap( cv::Point2f( 0.f, 0.f ) ) ;
 
 	mn_roi_origx = mn_globalmap_centx - Offset.x; // - (int)round( m_gridmap.info.origin.position.x / m_fResolution ) ;
 	mn_roi_origy = mn_globalmap_centy - Offset.y; //- (int)round( m_gridmap.info.origin.position.y / m_fResolution ) ;
