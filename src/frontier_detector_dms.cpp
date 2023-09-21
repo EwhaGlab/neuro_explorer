@@ -699,6 +699,10 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	nav_msgs::OccupancyGrid globalcostmap;
 
 	m_globalcostmap = *msg ;
+	globalcostmap = m_globalcostmap;
+
+ROS_INFO("got costmap size of %d %d \n", m_globalcostmap.info.height, m_globalcostmap.info.width );
+
 	generateGridmapFromCostmap();
 
 	float cmresolution=globalcostmap.info.resolution;
@@ -708,9 +712,10 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	float cmstarty=globalcostmap.info.origin.position.y;
 	uint32_t cmwidth =globalcostmap.info.width;
 	uint32_t cmheight=globalcostmap.info.height;
-	std::vector<signed char> cmdata  =globalcostmap.data;
+	std::vector<signed char> cmdata, gmdata;
 
-	std::vector<signed char> gmdata = m_gridmap.data;
+	cmdata =globalcostmap.data;
+	gmdata = m_gridmap.data;
 
 	// set the cent of the map as the init robot position (x, y)
 	//cv::Point Offset = compute_rpose_wrt_maporig() ;
@@ -758,7 +763,6 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 		}
 	}
 
-
 // The robot is not moving (or ready to move)... we can go ahead plan the next action...
 // i.e.) We locate frontier points again, followed by publishing the new goal
 
@@ -778,7 +782,6 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 		}
 	}
 	clusterToThreeLabels( img_ );
-
 /*******************************************************************************************************************************************
  We need to zero-pad around img b/c m_gridmap dynamically increases
  u = unk padding (offset), x = orig img contents
@@ -804,7 +807,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 //	int ngmx = static_cast<int>( (start.pose.position.x - gmstartx) / gmresolution ) ;
 //	int ngmy = static_cast<int>( (start.pose.position.y - gmstarty) / gmresolution ) ;
 
-ROS_INFO(" innner seed (%d %d)  map size: (%d %d)\n", ngmx, ngmy, img_plus_offset.rows, img_plus_offset.cols);
+//ROS_INFO(" innner seed (%d %d)  map size: (%d %d)\n", ngmx, ngmy, img_plus_offset.rows, img_plus_offset.cols);
 
 	dffp::FrontPropagation oFP(img_plus_offset); // image uchar
 	oFP.update(img_plus_offset, cv::Point(ngmx,ngmy), cv::Point(0,0) );
@@ -819,7 +822,6 @@ ROS_INFO(" innner seed (%d %d)  map size: (%d %d)\n", ngmx, ngmy, img_plus_offse
 	vector<vector<cv::Point> > contours_plus_offset;
 	vector<cv::Vec4i> hierarchy;
 	cv::findContours( img_frontiers_offset, contours_plus_offset, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE );
-
 
 #ifdef FD_DEBUG_MODE
 	string outfilename =  m_str_debugpath + "/global_mapimg.png" ;
@@ -1000,6 +1002,7 @@ ROS_INFO(" innner seed (%d %d)  map size: (%d %d)\n", ngmx, ngmy, img_plus_offse
 			}
 		}
 	}
+
 
 #ifdef FD_DEBUG_MODE
 	string strcandfile = m_str_debugpath + "/front_cand.txt" ;
