@@ -225,7 +225,7 @@ void FrontierDetectorDMS::generateGridmapFromCostmap( )
 			{
 				m_gridmap.data[ ii*gmwidth + jj ] = -1 ;
 			}
-			else if( obs_cost > 98 ) // mp_cost_translation_table[51:98] : 130~252 : possibly circumscribed ~ inscribed
+			else if( obs_cost > 97 ) // mp_cost_translation_table[51:98] : 130~252 : possibly circumscribed ~ inscribed
 			{
 				m_gridmap.data[ ii*gmwidth + jj] = 100 ;
 			}
@@ -697,54 +697,20 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	}
 
 	nav_msgs::OccupancyGrid globalcostmap;
-	float cmresolution, gmresolution, cmstartx, cmstarty;
-	uint32_t cmwidth, cmheight ;
-	std::vector<signed char> gmdata;
-	std::vector<signed char> cmdata;
 
 	m_globalcostmap = *msg ;
 	generateGridmapFromCostmap();
-	cmdata = globalcostmap.data;
-	gmdata = m_gridmap.data;
 
-//	{
-//		const std::unique_lock<mutex> lock(mutex_gridmap);
-//		m_gridmap = *msg ;
-//		gmdata = m_gridmap.data ;
-//		gmresolution = m_gridmap.info.resolution ;
-//		gmheight = m_gridmap.info.height ;
-//		gmwidth = m_gridmap.info.width ;
-//		gmstartx = m_gridmap.info.origin.position.x ;
-//		gmstarty = m_gridmap.info.origin.position.y ;
-//	}
-//
-//	//////////////////////////////////////////////////////////////////////////////////////////////////////
-//	// there is a minor bug here!!
-//	// the costmap and gridmap could be different even if they are the same sized.
-//	// costmap is a bit lagging behind the gridmap !!! This is a minor bug for AE, but a serious bug if we want to feed both Gmap and Cmap for training DNN !!!
-//	//////////////////////////////////////////////////////////////////////////////////////////////////////
-//	// TODO 1: I need to eliminate gridmap ... I should only use costmap to find FFP and do A* search
-//	//////////////////////////////////////////////////////////////////////////////////////////////////////
-//	{
-//		const std::unique_lock<mutex> lock(mutex_costmap);
-//		globalcostmap = m_globalcostmap;
-//		cmresolution=globalcostmap.info.resolution;
-//		cmstartx=globalcostmap.info.origin.position.x;
-//		cmstarty=globalcostmap.info.origin.position.y;
-//		cmwidth =globalcostmap.info.width;
-//		cmheight=globalcostmap.info.height;
-//		cmdata  =globalcostmap.data;
-//	}
-//
-//	if( gmheight == 0 || gmwidth == 0
-//		|| gmwidth  != cmwidth
-//		|| gmheight != cmheight)
-//	{
-//		ROS_WARN("unreliable grid map input h/w (%d, %d) gcostmap h/w (%d, %d). May be the (G)costmap has not been updated yet. \n",
-//				gmheight, gmwidth,
-//				cmheight, cmwidth);
-//		return;
-//	}
+	float cmresolution=globalcostmap.info.resolution;
+	float gmresolution= cmresolution ;
+
+	float cmstartx=globalcostmap.info.origin.position.x;
+	float cmstarty=globalcostmap.info.origin.position.y;
+	uint32_t cmwidth =globalcostmap.info.width;
+	uint32_t cmheight=globalcostmap.info.height;
+	std::vector<signed char> cmdata  =globalcostmap.data;
+
+	std::vector<signed char> gmdata = m_gridmap.data;
 
 	// set the cent of the map as the init robot position (x, y)
 	//cv::Point Offset = compute_rpose_wrt_maporig() ;
