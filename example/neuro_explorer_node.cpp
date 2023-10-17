@@ -95,9 +95,9 @@ int main(int argc, char** argv)
   slamid["slam_toolbox"] = SLAM_ID::SLAM_TOOLBOX;
   slamid["gtmapping"]	= SLAM_ID::GT_MAPPING;
 
-  int totnumthreads = omp_get_max_threads() ;
-  ROS_INFO("max num threads, input num threads: %d %d \n", totnumthreads, numthreads);
-  numthreads = MIN( totnumthreads, numthreads );
+  //int totnumthreads = omp_get_max_threads() ;
+  //ROS_INFO("max num threads, input num threads: %d %d \n", totnumthreads, numthreads);
+  //numthreads = MIN( totnumthreads, numthreads );
   ROS_INFO("slamid: %s %d \n", slam_method.c_str(), slamid[slam_method.c_str()]);
 
   switch( slamid[slam_method.c_str()] )

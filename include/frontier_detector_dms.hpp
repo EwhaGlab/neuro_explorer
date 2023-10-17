@@ -56,10 +56,11 @@ EMail:       kimy@ewha.ac.kr
 #include <unordered_set>
 #include <boost/format.hpp>
 #include <fstream>
+#include "tensorflow/c/c_api.h"
 
 //#define OCCUPANCY_THR (60)
 //#define DEBUG_MODE
-#define ROI_OFFSET (10)
+#define ROI_OFFSET (0) //16)
 #define DIST_HIGH  (1.0e10)
 #define FRONTIER_MARKER_SIZE (0.4)
 #define TARGET_MARKER_SIZE (0.5)
@@ -251,6 +252,9 @@ public:
         return (float)sqrt(  (lhs.x - rhs.x) * (lhs.x - rhs.x) + (lhs.y - rhs.y) * (lhs.y - rhs.y)  );
     }
 
+// tensorflow api
+    static void NoOpDeallocator(void* data, size_t a, void* b){};
+
 
 protected:
 
@@ -270,7 +274,7 @@ protected:
 	string mstr_debugpath ;
 	string mstr_inputparams ;
 	bool mb_isinitmotion_completed ;
-
+	int mn_max_gmap_height, mn_max_gmap_width ;
 	cv::Mat mcvu_mapimg, mcvu_costmapimg, mcvu_mapimgroi ;
 
 	FrontierFilter mo_frontierfilter;
@@ -294,6 +298,25 @@ protected:
 	ros::Time m_last_oscillation_reset ;
 	geometry_msgs::PoseStamped m_previous_robot_pose ;
 	geometry_msgs::PoseStamped m_init_robot_pose ;
+
+// tensorflow api
+	TF_Graph* mptf_Graph;
+	TF_Status* mptf_Status ;
+    TF_SessionOptions* mptf_SessionOpts ;
+    TF_Buffer* mptf_RunOpts ;
+    TF_Session* mptf_Session;
+    string m_str_modelfilepath;
+    TF_Output* mptf_input ;
+    TF_Output mtf_t0 ;
+    TF_Output* mptf_output ;
+    TF_Output mtf_t2 ;
+
+    TF_Tensor** mpptf_input_values ;
+    TF_Tensor** mpptf_output_values ;
+
+    TF_Tensor* mptf_int_tensor ;
+    float* mpf_data ;
+    float* mpf_result ;
 
 private:
 	std::mutex mutex_robot_state;

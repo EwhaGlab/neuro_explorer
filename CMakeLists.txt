@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(autoexplorer)
+project(neuro_explorer)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -147,20 +147,21 @@ include_directories(
   #~/catkin_ws/src/navigation/navfn/include 
 )
 
-set(AUTOEXPLORER_PROJ_DIRECTORY ${PROJECT_SOURCE_DIR} )
+set(NEUROEXPLORER_PROJ_DIRECTORY ${PROJECT_SOURCE_DIR} )
 file(GLOB_RECURSE SRC_FILES 
 ${PROJECT_SOURCE_DIR}/src/*.cpp
 )
 
 message("pkg: " ${catkin_INCLUDE_DIRS})
 
-add_library(autoexplorer SHARED ${SRC_FILES})
-target_link_libraries(autoexplorer 
+add_library(neuro_explorer SHARED ${SRC_FILES})
+target_link_libraries(neuro_explorer 
 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_LIBS}
+tensorflow_framework tensorflow
 )
 
-set_target_properties( autoexplorer PROPERTIES
-  LIBRARY_OUTPUT_DIRECTORY ${AUTOEXPLORER_PROJ_DIRECTORY}/lib 
+set_target_properties( neuro_explorer PROPERTIES
+  LIBRARY_OUTPUT_DIRECTORY ${NEUROEXPLORER_PROJ_DIRECTORY}/lib 
 )
 
 ## Declare a C++ library
@@ -179,18 +180,18 @@ set_target_properties( autoexplorer PROPERTIES
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node example/autoexplorer_node.cpp)
-add_executable(scan2ptcloud_node example/scan_to_ptcloud_node.cpp)
+add_executable(${PROJECT_NAME}_node example/neuro_explorer_node.cpp)
+#add_executable(scan2ptcloud_node example/scan_to_ptcloud_node.cpp)
 
 #add_executable(travel_tracker example/travel_tracker.py)
 
-#target_compile_options(autoexplorer PRIVATE ${OpenMP_FLAGS})
-#add_dependencies(autoexplorer ${catkin_EXPORTED_TARGETS})
+#target_compile_options(neuro_explorer PRIVATE ${OpenMP_FLAGS})
+#add_dependencies(neuro_explorer ${catkin_EXPORTED_TARGETS})
 
-target_link_libraries(${PROJECT_NAME}_node autoexplorer)
-target_link_libraries(scan2ptcloud_node autoexplorer)
+target_link_libraries(${PROJECT_NAME}_node neuro_explorer )
+#target_link_libraries(scan2ptcloud_node neuro_explorer)
 
-#target_link_libraries(travel_tracker autoexplorer)
+#target_link_libraries(travel_tracker neuro_explorer)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -227,9 +228,9 @@ install(TARGETS ${PROJECT_NAME}_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(TARGETS scan2ptcloud_node
-    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+# install(TARGETS scan2ptcloud_node
+#     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 #install(TARGETS travel_tracker
 #    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

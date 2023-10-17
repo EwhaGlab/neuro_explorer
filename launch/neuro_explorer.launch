@@ -3,7 +3,7 @@
 -->
 <launch>
     <!--env name="ROSCONSOLE_CONFIG_FILE"
-       value="$(find autoexplorer)/config/ffd_rosconsole.conf"/-->
+       value="$(find neuro_explorer)/config/ffd_rosconsole.conf"/-->
 
     <!-- launch octomap -->
     <!--include file="$(find octomap_server)/launch/octomap_mapping.launch"/-->
@@ -15,18 +15,18 @@
     <!--param name="slam_method" value="$(arg slam_method)"/-->
     <param name="numthreads" value="$(arg numthreads)"/>
     
-    <arg name="rviz_config" value ="$(find autoexplorer)/launch/includes/rviz_config/autoexplorer.rviz"/>
-    <rosparam command="load" file="$(find autoexplorer)/param/autoexploration.yaml"/>
+    <arg name="rviz_config" value ="$(find neuro_explorer)/launch/includes/rviz_config/neuro_explorer.rviz"/>
+    <rosparam command="load" file="$(find neuro_explorer)/param/autoexploration.yaml"/>
     
-    <!--include file="$(find autoexplorer)/launch/includes/explore_bench-corridor.launch"/-->
+    <!--include file="$(find neuro_explorer)/launch/includes/explore_bench-corridor.launch"/-->
     
-    <node pkg="autoexplorer" type="autoexplorer_node" name="autoexplorer" args="$(arg slam_method) $(arg numthreads)" output="screen"/>
+    <node pkg="neuro_explorer" type="neuro_explorer_node" name="neuro_explorer" args="$(arg slam_method) $(arg numthreads)" output="screen"/>
     <!--include file="$(find path_tracker)/launch/path_tracker.launch" output="screen"/-->
-    <!--node pkg="autoexplorer" type="autoexplorer_node" name="autoexplorer" output="screen">
+    <!--node pkg="neuro_explorer" type="neuro_explorer_node" name="neuro_explorer" output="screen">
         <param name="frame_id" type="string" value="map" />
     </node-->
     
-    <!--node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/-->    
+    <node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/>    
 
     <!-- bag -->
     <!--node pkg="rosbag" type="record" name="rosbag_record" args="record -a -o /media/data/results/explore_bench/bag/"/-->
