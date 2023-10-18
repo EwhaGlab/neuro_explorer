@@ -1130,8 +1130,8 @@ ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
 		if( globalcostmap.info.width > 0 )
 		{
 ROS_ERROR("getting error here in conf measure fn b/c costmap size is downsampled \n");
-		//	mo_frontierfilter.measureCostmapConfidence(globalcostmap, voFrontierCands);
-		//	mo_frontierfilter.measureGridmapConfidence(m_gridmap, voFrontierCands);
+			mo_frontierfilter.measureCostmapConfidence(globalcostmap, voFrontierCands);
+			mo_frontierfilter.measureGridmapConfidence(m_gridmap, voFrontierCands);
 			for(size_t idx=0; idx < voFrontierCands.size(); idx++)
 			{
 				cv::Point frontier_in_gm = voFrontierCands[idx].GetCorrectedGridmapPosition();
@@ -1322,13 +1322,11 @@ ROS_INFO("plan to goal: %f %f status %d \n", goal.pose.position.x, goal.pose.pos
 
 			if( fendpot > 0 && fendpot < fupperbound  )
 			{
-ROS_INFO("updating upperbound \n");
 				omp_set_lock(&m_mplock);
 				fupperbound = fendpot; // set new bound;
 				best_idx = fptidx;
 				best_plan = plan;
 				omp_unset_lock(&m_mplock);
-ROS_INFO("finishing the update \n");
 			}
 		}
 	}
@@ -1353,11 +1351,9 @@ double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 		}
 		tmpcnt++;
 	}
-
 	//cv::Point2f cvbestgoal = cvgoalcands[best_idx] ;  // just for now... we need to fix it later
 	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[best_idx] ; //ps.p[0], ps.p[1], 0.f );
 
-ROS_INFO("best plan has found at <%f %f> \n", best_goal.pose.position.x, best_goal.pose.position.y );
 // if the best frontier point is the same as the previous frontier point, we need to set a different goal
 
 	// check for ocsillation
@@ -1411,7 +1407,7 @@ ROS_INFO("best plan has found at <%f %f> \n", best_goal.pose.position.x, best_go
 //		ROS_ASSERT( goalexclusivefpts.poses.size() >  mn_prev_nbv_posidx );
 
 		// choose the next best goal based on the eucdist heurisitic.
-		ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", goalexclusivefpts.poses.size() );
+ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", goalexclusivefpts.poses.size() );
 		geometry_msgs::PoseStamped nextbestpoint = StampedPosefromSE2( 0.f, 0.f, 0.f ) ;
 		selectNextBestPoint( start,  goalexclusivefpts, nextbestpoint) ;
 ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n");
@@ -1458,7 +1454,6 @@ ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n
 #endif
 
 	{
-ROS_INFO("start moving the robot \n");
 		const std::unique_lock<mutex> lock(mutex_robot_state) ;
 		me_robotstate = ROBOT_STATE::ROBOT_IS_READY_TO_MOVE;
 	}
