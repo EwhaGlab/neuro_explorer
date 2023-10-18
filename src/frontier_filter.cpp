@@ -123,13 +123,13 @@ ROS_INFO("origin in costmap: %f %f\n", fXstart, fXstart );
 		//int px_c=  floor( (frontier_in_world.x - fXstart ) / resolution  ) ;
 		int8_t cost ;
 		int32_t ncost = 0;
-ROS_INFO("costmap roi size: %d \n", mn_costmap_roi_size);
-ROS_INFO("px_c, py_c <%d %d>\n", px_c, py_c);
+//ROS_INFO("costmap roi size: %d \n", mn_costmap_roi_size);
+//ROS_INFO("px_c, py_c <%d %d>\n", px_c, py_c);
 		int sx = MAX(px_c - mn_costmap_roi_size, 0);
 		int ex = MIN(px_c + mn_costmap_roi_size, width) ;
 		int sy = MAX(py_c - mn_costmap_roi_size, 0);
 		int ey = MIN(py_c + mn_costmap_roi_size, height) ;
-ROS_INFO("cm test window: %d %d %d %d \n", sx, ex, sy, ey);
+//ROS_INFO("cm test window: %d %d %d %d \n", sx, ex, sy, ey);
 		//ofs_fpc << px_c << " " << py_c << endl;
 
 #ifdef FD_DEBUG_MODE
@@ -145,7 +145,7 @@ ROS_INFO("cm test window: %d %d %d %d \n", sx, ex, sy, ey);
 			{
 				//int dataidx = px_c + cidx + (py_c + ridx) * width ;
 				int dataidx = ridx * width + cidx ;
-ROS_INFO("ind rix cidx %d %d %d ", idx, ridx, cidx);
+//ROS_INFO("ind rix cidx %d %d %d ", idx, ridx, cidx);
 				cost = Data[dataidx] ; // 0 ~ 254 --> mapped to 0 ~ 100
 				//if(cost >= 0 )// m_nlethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
 				if(cost >  mn_lethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
