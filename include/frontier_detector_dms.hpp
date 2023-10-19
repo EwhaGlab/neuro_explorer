@@ -255,6 +255,8 @@ public:
 // tensorflow api
     static void NoOpDeallocator(void* data, size_t a, void* b){};
 
+    void run_tf_fr_detector_session( const cv::Mat& input_map, cv::Mat& model_output ) ;
+    void run_tf_astar_session( const cv::Mat& input_map, cv::Mat& model_output );
 
 protected:
 
@@ -300,23 +302,21 @@ protected:
 	geometry_msgs::PoseStamped m_init_robot_pose ;
 
 // tensorflow api
-	TF_Graph* mptf_Graph;
-	TF_Status* mptf_Status ;
-    TF_SessionOptions* mptf_SessionOpts ;
-    TF_Buffer* mptf_RunOpts ;
-    TF_Session* mptf_Session;
-    string m_str_modelfilepath;
-    TF_Output* mptf_input ;
-    TF_Output mtf_t0 ;
-    TF_Output* mptf_output ;
-    TF_Output mtf_t2 ;
-
-    TF_Tensor** mpptf_input_values ;
-    TF_Tensor** mpptf_output_values ;
-
-    TF_Tensor* mptf_int_tensor ;
-    float* mpf_data ;
-    float* mpf_result ;
+	TF_Graph* mptf_fd_Graph;
+	TF_Status* mptf_fd_Status ;
+    TF_SessionOptions* mptf_fd_SessionOpts ;
+    TF_Buffer* mptf_fd_RunOpts ;
+    TF_Session* mptf_fd_Session;
+    string m_str_fd_modelfilepath;
+    TF_Output* mptf_fd_input ;
+    TF_Output mtf_fd_t0 ;
+    TF_Output* mptf_fd_output ;
+    TF_Output mtf_fd_t2 ;
+    TF_Tensor** mpptf_fd_input_values ;
+    TF_Tensor** mpptf_fd_output_values ;
+    TF_Tensor* mptf_fd_int_tensor ;
+    float* mpf_fd_data ;
+    float* mpf_fd_result ;
 
 private:
 	std::mutex mutex_robot_state;

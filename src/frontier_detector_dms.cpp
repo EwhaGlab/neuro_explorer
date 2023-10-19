@@ -74,7 +74,7 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
 	m_nh.param("/move_base/global_costmap/resolution", mf_resolution, 0.05f) ;
 	m_nh.param("move_base/global_costmap/robot_radius", mf_robot_radius, 0.12); // 0.3 for fetch
 
-	m_nh.getParam("/tf_loader/modelfilepath", m_str_modelfilepath);
+	m_nh.getParam("/tf_loader/modelfilepath", m_str_fd_modelfilepath);
 	//m_nh.getParam("/tf_loader/max_gmap_width", mn_max_gmap_width);
 	//m_nh.getParam("/tf_loader/max_gmap_height", mn_max_gmap_height);
 	mn_max_gmap_height = mn_globalmap_height / 2 ;
@@ -170,55 +170,55 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
 	m_last_oscillation_reset = ros::Time::now();
 
 // tf loaders
-    mptf_Graph = TF_NewGraph();
-    mptf_Status = TF_NewStatus();
-    mptf_SessionOpts = TF_NewSessionOptions();
-    mptf_RunOpts = NULL;
+    mptf_fd_Graph = TF_NewGraph();
+    mptf_fd_Status = TF_NewStatus();
+    mptf_fd_SessionOpts = TF_NewSessionOptions();
+    mptf_fd_RunOpts = NULL;
 
     const char* tags = "serve"; // default model serving tag; can change in future
     int ntags = 1;
-    mptf_Session = TF_LoadSessionFromSavedModel(mptf_SessionOpts, mptf_RunOpts, m_str_modelfilepath.c_str(), &tags, ntags, mptf_Graph, NULL, mptf_Status);
-    if(TF_GetCode(mptf_Status) == TF_OK)
+    mptf_fd_Session = TF_LoadSessionFromSavedModel(mptf_fd_SessionOpts, mptf_fd_RunOpts, m_str_fd_modelfilepath.c_str(), &tags, ntags, mptf_fd_Graph, NULL, mptf_fd_Status);
+    if(TF_GetCode(mptf_fd_Status) == TF_OK)
     {
         printf("TF_LoadSessionFromSavedModel OK at the init state\n");
     }
     else
     {
-        printf("%s",TF_Message(mptf_Status));
+        printf("%s",TF_Message(mptf_fd_Status));
     }
 
     //****** Get input tensor
     //TODO : need to use saved_model_cli to read saved_model arch
     int NumInputs = 1;
-    mptf_input = (TF_Output*)malloc(sizeof(TF_Output) * NumInputs);
+    mptf_fd_input = (TF_Output*)malloc(sizeof(TF_Output) * NumInputs);
 
-    mtf_t0 = {TF_GraphOperationByName(mptf_Graph, "serving_default_input_1"), 0};
-    if(mtf_t0.oper == NULL)
+    mtf_fd_t0 = {TF_GraphOperationByName(mptf_fd_Graph, "serving_default_input_1"), 0};
+    if(mtf_fd_t0.oper == NULL)
         printf("ERROR: Failed TF_GraphOperationByName serving_default_input_1\n");
     else
 	printf("TF_GraphOperationByName serving_default_input_1 is OK\n");
 
-    mptf_input[0] = mtf_t0;
+    mptf_fd_input[0] = mtf_fd_t0;
 
     //********* Get Output tensor
     int NumOutputs = 1;
-    mptf_output = (TF_Output*)malloc(sizeof(TF_Output) * NumOutputs);
+    mptf_fd_output = (TF_Output*)malloc(sizeof(TF_Output) * NumOutputs);
 
-    mtf_t2 = {TF_GraphOperationByName(mptf_Graph, "StatefulPartitionedCall"), 0};
-    if(mtf_t2.oper == NULL)
+    mtf_fd_t2 = {TF_GraphOperationByName(mptf_fd_Graph, "StatefulPartitionedCall"), 0};
+    if(mtf_fd_t2.oper == NULL)
         printf("ERROR: Failed TF_GraphOperationByName StatefulPartitionedCall\n");
     else
 	printf("TF_GraphOperationByName StatefulPartitionedCall is OK\n");
 
-    mptf_output[0] = mtf_t2;
+    mptf_fd_output[0] = mtf_fd_t2;
 
     //*** allocate data for inputs & outputs
-    mpptf_input_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumInputs);
-    mpptf_output_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumOutputs);
+    mpptf_fd_input_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumInputs);
+    mpptf_fd_output_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumOutputs);
 
     //*** data allocation
-    mpf_data = new float[ (mn_globalmap_height+32) * (mn_globalmap_width+32) ];
-    mpf_result = new float[ (mn_globalmap_height+32) * (mn_globalmap_width+32) ];
+    mpf_fd_data = new float[ (mn_globalmap_height+32) * (mn_globalmap_width+32) ];
+    mpf_fd_result = new float[ (mn_globalmap_height+32) * (mn_globalmap_width+32) ];
 
 }
 
@@ -226,12 +226,12 @@ FrontierDetectorDMS::~FrontierDetectorDMS()
 {
 	delete [] mp_cost_translation_table;
 //Free tensorflow instances
-	free(mpptf_input_values);
-	free(mpptf_output_values);
-	free(mptf_output);
-	free(mptf_input);
-	delete [] mpf_data ;
-	delete [] mpf_result ;
+	free(mpptf_fd_input_values);
+	free(mpptf_fd_output_values);
+	free(mptf_fd_output);
+	free(mptf_fd_input);
+	delete [] mpf_fd_data ;
+	delete [] mpf_fd_result ;
 }
 
 void FrontierDetectorDMS::initmotion(  const float& fvx = 0.f, const float& fvy = 0.f, const float& ftheta = 1.f  )
@@ -921,46 +921,9 @@ cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", proc
 // DNN FFP detection
 ROS_INFO("begin DNN FR detection \n");
 
-	memset( mpf_data, 0.f, processed_gmap.cols * processed_gmap.rows*sizeof(float) );
-	memset( mpf_result, 0.f, processed_gmap.cols * processed_gmap.rows*sizeof(float) );
+	cv::Mat model_output = processed_gmap.clone();
+	run_tf_fr_detector_session(processed_gmap, model_output);
 
-    for(int ridx=0; ridx < processed_gmap.rows; ridx++)
-    {
-    	for(int cidx=0; cidx < processed_gmap.cols; cidx++)
-    	{
-    		int lidx = ridx * processed_gmap.cols + cidx ;
-    		mpf_data[lidx] = static_cast<float>(processed_gmap.data[lidx]) / 255.f   ;
-    	}
-    }
-    const int ndata = sizeof(float)*1*processed_gmap.rows*processed_gmap.cols*1 ;
-    const int64_t dims[] = {1, processed_gmap.rows, processed_gmap.cols, 1};
-    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_data, ndata, &NoOpDeallocator, 0);
-    if (int_tensor != NULL)
-    {
-    	ROS_INFO("TF_NewTensor is OK\n");
-    }
-    else
-    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
-
-    mpptf_input_values[0] = int_tensor;
-    // //Run the Session
-    TF_SessionRun(mptf_Session, NULL, mptf_input, mpptf_input_values, 1, mptf_output, mpptf_output_values, 1, NULL, 0, NULL, mptf_Status);
-    if(TF_GetCode(mptf_Status) == TF_OK)
-    {
-    	ROS_INFO("Session is OK\n");
-    }
-    else
-    {
-    	ROS_INFO("%s",TF_Message(mptf_Status));
-    }
-
-    cv::Mat res_32F(512, 512, CV_32FC1, TF_TensorData(*mpptf_output_values));
-	double minVal, maxVal;
-	cv::minMaxLoc( res_32F, &minVal, &maxVal );
-//	printf("max min: %f %f\n", maxVal, minVal);
-	cv::Mat model_output = ( res_32F > maxVal * 0.3 ) * 255 ;
-	cv::Mat dst_offset;
-	cvtColor(model_output, dst_offset, cv::COLOR_GRAY2BGR);
 	cv::imwrite("/home/hankm/results/neuro_exploration_res/out.png", model_output);
 
 ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", model_output.rows, model_output.cols );
@@ -1484,6 +1447,90 @@ mn_mapcallcnt++;
 mf_totalcallbacktime_msec = mf_totalcallbacktime_msec + mapcallback_time + planning_time ;
 mf_totalplanningtime_msec = mf_totalplanningtime_msec + planning_time ;
 
+}
+
+void FrontierDetectorDMS::run_tf_fr_detector_session( const cv::Mat& input_map, cv::Mat& model_output)
+{
+	memset( mpf_fd_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+	memset( mpf_fd_result, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+
+    for(int ridx=0; ridx < input_map.rows; ridx++)
+    {
+    	for(int cidx=0; cidx < input_map.cols; cidx++)
+    	{
+    		int lidx = ridx * input_map.cols + cidx ;
+    		mpf_fd_data[lidx] = static_cast<float>(input_map.data[lidx]) / 255.f   ;
+    	}
+    }
+    const int ndata = sizeof(float)*1*input_map.rows*input_map.cols*1 ;
+    const int64_t dims[] = {1, input_map.rows, input_map.cols, 1};
+    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_fd_data, ndata, &NoOpDeallocator, 0);
+    if (int_tensor != NULL)
+    {
+    	ROS_INFO("TF_NewTensor is OK\n");
+    }
+    else
+    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
+
+    mpptf_fd_input_values[0] = int_tensor;
+    // //Run the Session
+    TF_SessionRun(mptf_fd_Session, NULL, mptf_fd_input, mpptf_fd_input_values, 1, mptf_fd_output, mpptf_fd_output_values, 1, NULL, 0, NULL, mptf_fd_Status);
+    if(TF_GetCode(mptf_fd_Status) == TF_OK)
+    {
+    	ROS_INFO("Session is OK\n");
+    }
+    else
+    {
+    	ROS_INFO("%s",TF_Message(mptf_fd_Status));
+    }
+
+    cv::Mat res_32F(512, 512, CV_32FC1, TF_TensorData(*mpptf_fd_output_values));
+	double minVal, maxVal;
+	cv::minMaxLoc( res_32F, &minVal, &maxVal );
+//	printf("max min: %f %f\n", maxVal, minVal);
+	model_output = ( res_32F > maxVal * 0.3 ) * 255 ;
+}
+
+void FrontierDetectorDMS::run_tf_astar_session( const cv::Mat& input_map, cv::Mat& model_output)
+{
+//	memset( mpf_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+//	memset( mpf_result, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+//
+//    for(int ridx=0; ridx < input_map.rows; ridx++)
+//    {
+//    	for(int cidx=0; cidx < input_map.cols; cidx++)
+//    	{
+//    		int lidx = ridx * input_map.cols + cidx ;
+//    		mpf_data[lidx] = static_cast<float>(input_map.data[lidx]) / 255.f   ;
+//    	}
+//    }
+//    const int ndata = sizeof(float)*1*input_map.rows*input_map.cols*1 ;
+//    const int64_t dims[] = {1, input_map.rows, input_map.cols, 1};
+//    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_data, ndata, &NoOpDeallocator, 0);
+//    if (int_tensor != NULL)
+//    {
+//    	ROS_INFO("TF_NewTensor is OK\n");
+//    }
+//    else
+//    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
+//
+//    mpptf_input_values[0] = int_tensor;
+//    // //Run the Session
+//    TF_SessionRun(mptf_Session, NULL, mptf_input, mpptf_input_values, 1, mptf_output, mpptf_output_values, 1, NULL, 0, NULL, mptf_Status);
+//    if(TF_GetCode(mptf_Status) == TF_OK)
+//    {
+//    	ROS_INFO("Session is OK\n");
+//    }
+//    else
+//    {
+//    	ROS_INFO("%s",TF_Message(mptf_Status));
+//    }
+//
+//    cv::Mat res_32F(512, 512, CV_32FC1, TF_TensorData(*mpptf_output_values));
+//	double minVal, maxVal;
+//	cv::minMaxLoc( res_32F, &minVal, &maxVal );
+////	printf("max min: %f %f\n", maxVal, minVal);
+//	model_output = ( res_32F > maxVal * 0.3 ) * 255 ;
 }
 
 
