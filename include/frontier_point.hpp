@@ -65,22 +65,61 @@ struct pointset
 	bool operator<(const pointset& rhs) const
 	{return xy < rhs.xy;}
 
-	float p[2];
-
-//  float p[2];
-//  pointset(float x, float y){p[0]=x; p[1]=y; };
-//  pointset(){};
-//
-//  bool operator()( const pointset & pa, const pointset & pb) const
-//  {
-//    for (size_t n=0; n<2; ++n)
-//    {
-//      if ( pa.p[n] < pb.p[n] ) return true;
-//      if ( pa.p[n] > pb.p[n] ) return false;
-//    }
-//    return false;
-//  }
+	float p[2]; // point in world coordinate frame
+	int label;
 };
+
+typedef struct pointclass
+{
+public:
+	pointclass( int nx, int ny, int nlabel ):
+		x(nx), y(ny), label(nlabel)
+	{};
+	int x, y, label;
+}PointClass;
+
+typedef struct rgb
+{
+public:
+	rgb( float fr, float fg, float fb ):
+		r(fr), g(fg), b(fb)
+	{};
+	float r, g, b;
+}rgb;
+
+typedef struct pointclassset
+{
+
+public:
+
+	pointclassset( rgb cvminColor, rgb cvmaxcolor, int nmaxlabel ):
+		minColor(cvminColor), maxColor(cvmaxcolor), maxlabel(nmaxlabel)
+	{};
+	inline rgb get_color(double alpha, const rgb& c0, const rgb& c1)
+	{
+		float r = (1-alpha) * c0.r  +  alpha * c1.r ;
+		float g = (1-alpha) * c0.g  +  alpha * c1.g ;
+		float b = (1-alpha) * c0.b  +  alpha * c1.b ;
+	    return rgb(r,g,b);
+	}
+	std::vector<PointClass> point_classes ;
+	std::vector<rgb> point_colors ;
+
+	void push_point( PointClass pc)
+	{
+		point_classes.push_back(pc);
+		float alpha = (float)pc.label / (float)maxlabel ;
+		rgb color = get_color( alpha, minColor, maxColor );
+		point_colors.push_back(color);
+	}
+
+	std::vector<PointClass> GetPointClass() const {return point_classes; }
+	std::vector<rgb> GetPointColor() const {return point_colors; }
+
+	int maxlabel ;
+	rgb minColor, maxColor ;
+
+}PointClassSet;
 
 
 enum PointState{ NOT_TESTED = 0, GM_TESTED, CM_FILTERED, FULL_TESTED };
@@ -149,9 +188,9 @@ public:
 		mf_correctedposition_w = gridmap2world( mn_correctedposition_gm  );
 	}
 
-	void SetFrontierFlag( const float& fcm_conf, const float& fgm_conf, const bool& bisexplored )
+	void SetFrontierFlag( const float& fcm_conf, const float& fgm_conf, const bool& bisexplored, const bool& bisfrontier )
 	{
-		if( mf_gridmap_confidence < fgm_conf || mf_costmap_confidence < fcm_conf || bisexplored )
+		if( mf_gridmap_confidence < fgm_conf || mf_costmap_confidence < fcm_conf || bisexplored || !bisfrontier)
 			mb_isfrontierpoint = false;
 		else
 			mb_isfrontierpoint = true;

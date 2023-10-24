@@ -56,6 +56,9 @@ EMail:       kimy@ewha.ac.kr
 #include <unordered_set>
 #include <boost/format.hpp>
 #include <fstream>
+
+#include "image_data_handler.hpp"
+
 #include "tensorflow/c/c_api.h"
 
 //#define OCCUPANCY_THR (60)
@@ -226,6 +229,40 @@ public:
 		}
 	}
 
+	inline bool is_frontier_point( int nx, int ny, int nwidth, int nheight, const std::vector<signed char>& gmdata )
+	{
+		// 0	1	2
+		// 3		5
+		// 6	7	8
+
+		if( nx < 1 || nx > nwidth-2 || ny < 1 || ny > nheight -2 )  // this point is at the border of the map
+			return false;
+
+		int i0 = nwidth * (ny - 1) 	+	nx - 1 ;
+		int i1 = nwidth * (ny - 1) 	+	nx 		;
+		int i2 = nwidth * (ny - 1) 	+	nx + 1	;
+		int i3 = nwidth * ny			+	nx - 1 ;
+		int i5 = nwidth * ny			+	nx + 1 ;
+		int i6 = nwidth * (ny + 1)	+	nx - 1 ;
+		int i7 = nwidth * (ny + 1)	+	nx		;
+		int i8 = nwidth * (ny + 1)	+	nx + 1 ;
+
+		if( gmdata[ nwidth*ny + nx ] != -1 )
+		{
+			// nx and ny must be UNKNOWN
+			false;
+		}
+		else if( gmdata[i0] < 0 && gmdata[i1] < 0 && gmdata[i2] < 0 && gmdata[i3] < 0 &&  gmdata[i5] < 0 && gmdata[i6] < 0 && gmdata[i7] < 0 && gmdata[i8] < 0 )
+		{
+			// at least one of its neighboring point must be FREE
+			return false ;
+		}
+		else
+		{
+			return true ;
+		}
+	}
+
 
     inline bool equals_to_prevgoal( const geometry_msgs::PoseStamped& in_goal )
     {
@@ -252,11 +289,16 @@ public:
         return (float)sqrt(  (lhs.x - rhs.x) * (lhs.x - rhs.x) + (lhs.y - rhs.y) * (lhs.y - rhs.y)  );
     }
 
-// tensorflow api
+// tensorflow apis
     static void NoOpDeallocator(void* data, size_t a, void* b){};
-
     void run_tf_fr_detector_session( const cv::Mat& input_map, cv::Mat& model_output ) ;
     void run_tf_astar_session( const cv::Mat& input_map, cv::Mat& model_output );
+
+// optimal FR pt selection
+    int locate_optimal_point_from_potmap( const cv::Mat& input_potmap, const uint8_t& optVal, vector<cv::Point>& points   ) ;
+
+    int assign_potmap_point_class( const cv::Mat& input_potmap, vector<PointClass>& points   ) ;
+
 
 protected:
 
@@ -276,7 +318,7 @@ protected:
 	string mstr_debugpath ;
 	string mstr_inputparams ;
 	bool mb_isinitmotion_completed ;
-	int mn_max_gmap_height, mn_max_gmap_width ;
+	int mn_processed_gmap_height, mn_processed_gmap_width ;  // down sampled img for DNN network
 	cv::Mat mcvu_mapimg, mcvu_costmapimg, mcvu_mapimgroi ;
 
 	FrontierFilter mo_frontierfilter;
@@ -302,6 +344,7 @@ protected:
 	geometry_msgs::PoseStamped m_init_robot_pose ;
 
 // tensorflow api
+// frontier detection
 	TF_Graph* mptf_fd_Graph;
 	TF_Status* mptf_fd_Status ;
     TF_SessionOptions* mptf_fd_SessionOpts ;
@@ -317,6 +360,25 @@ protected:
     TF_Tensor* mptf_fd_int_tensor ;
     float* mpf_fd_data ;
     float* mpf_fd_result ;
+
+// astar potmap predictor network
+	TF_Graph* mptf_astar_Graph;
+	TF_Status* mptf_astar_Status ;
+    TF_SessionOptions* mptf_astar_SessionOpts ;
+    TF_Buffer* mptf_astar_RunOpts ;
+    TF_Session* mptf_astar_Session;
+    string m_str_astar_modelfilepath;
+    TF_Output* mptf_astar_input ;
+    TF_Output mtf_astar_t0 ;
+    TF_Output* mptf_astar_output ;
+    TF_Output mtf_astar_t2 ;
+    TF_Tensor** mpptf_astar_input_values ;
+    TF_Tensor** mpptf_astar_output_values ;
+    TF_Tensor* mptf_astar_int_tensor ;
+    float* mpf_astar_data ;
+    float* mpf_astar_result ;
+
+    int mn_num_classes ;
 
 private:
 	std::mutex mutex_robot_state;
@@ -335,6 +397,8 @@ private:
 	// for debug
 	int mn_mapcallcnt, mn_mapdatacnt ;
 	double mf_avgcallbacktime_msec, mf_avgplanngtime_msec, mf_totalcallbacktime_msec, mf_totalplanningtime_msec ;
+
+	ImageDataHandler m_data_handler;
 };
 
 }

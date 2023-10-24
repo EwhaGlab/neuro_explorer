@@ -53,7 +53,8 @@ mp_cost_translation_table(NULL),
 mb_strict_unreachable_decision(true),
 me_prev_exploration_state( SUCCEEDED ), mb_nbv_selected(false), //, mn_prev_nbv_posidx(-1)
 mb_allow_unknown(true),
-mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_totalcallbacktime_msec(0.f), mf_totalplanningtime_msec(0.f)
+mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_totalcallbacktime_msec(0.f), mf_totalplanningtime_msec(0.f),
+mn_num_classes(8)
 {
 	float fcostmap_conf_thr, fgridmap_conf_thr; // mf_unreachable_decision_bound ;
 	int nweakcomp_threshold ;
@@ -74,11 +75,13 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
 	m_nh.param("/move_base/global_costmap/resolution", mf_resolution, 0.05f) ;
 	m_nh.param("move_base/global_costmap/robot_radius", mf_robot_radius, 0.12); // 0.3 for fetch
 
-	m_nh.getParam("/tf_loader/modelfilepath", m_str_fd_modelfilepath);
+	m_nh.getParam("/tf_loader/fd_model_filepath", m_str_fd_modelfilepath);
+	m_nh.getParam("/tf_loader/astar_model_filepath", m_str_astar_modelfilepath);
+	m_nh.param("/tf_loader/num_classes", mn_num_classes);
 	//m_nh.getParam("/tf_loader/max_gmap_width", mn_max_gmap_width);
 	//m_nh.getParam("/tf_loader/max_gmap_height", mn_max_gmap_height);
-	mn_max_gmap_height = mn_globalmap_height / 2 ;
-	mn_max_gmap_width = mn_globalmap_width / 2 ;
+	mn_processed_gmap_height = mn_globalmap_height / 2 ;
+	mn_processed_gmap_width = mn_globalmap_width / 2 ;
 
 	mn_scale = pow(2, mn_numpyrdownsample);
 	m_frontiers_region_thr = nweakcomp_threshold / mn_scale ;
@@ -169,7 +172,9 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
 
 	m_last_oscillation_reset = ros::Time::now();
 
-// tf loaders
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// tf FD model
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     mptf_fd_Graph = TF_NewGraph();
     mptf_fd_Status = TF_NewStatus();
     mptf_fd_SessionOpts = TF_NewSessionOptions();
@@ -217,8 +222,60 @@ mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_t
     mpptf_fd_output_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumOutputs);
 
     //*** data allocation
-    mpf_fd_data = new float[ (mn_globalmap_height+32) * (mn_globalmap_width+32) ];
-    mpf_fd_result = new float[ (mn_globalmap_height+32) * (mn_globalmap_width+32) ];
+    mpf_fd_data = new float[ (mn_processed_gmap_height) * (mn_processed_gmap_width) ];
+    mpf_fd_result = new float[ (mn_processed_gmap_height) * (mn_processed_gmap_width) ];
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// tf astar model
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	mptf_astar_Graph = TF_NewGraph();
+	mptf_astar_Status = TF_NewStatus();
+	mptf_astar_SessionOpts = TF_NewSessionOptions();
+	mptf_astar_RunOpts = NULL;
+
+	mptf_astar_Session = TF_LoadSessionFromSavedModel(mptf_astar_SessionOpts, mptf_astar_RunOpts, m_str_astar_modelfilepath.c_str(), &tags, ntags, mptf_astar_Graph, NULL, mptf_astar_Status);
+	if(TF_GetCode(mptf_astar_Status) == TF_OK)
+	{
+		printf("TF_LoadSessionFromSavedModel OK at the init state\n");
+	}
+	else
+	{
+		printf("%s",TF_Message(mptf_astar_Status));
+	}
+
+	//****** Get input tensor
+	//TODO : need to use saved_model_cli to read saved_model arch
+	mptf_astar_input = (TF_Output*)malloc(sizeof(TF_Output) * NumInputs);
+	mtf_astar_t0 = {TF_GraphOperationByName(mptf_astar_Graph, "serving_default_input_1"), 0};
+	if(mtf_astar_t0.oper == NULL)
+		printf("ERROR: Failed TF_GraphOperationByName serving_default_input_1\n");
+	else
+	printf("TF_GraphOperationByName serving_default_input_1 is OK\n");
+
+	mptf_astar_input[0] = mtf_astar_t0;
+
+	//********* Get Output tensor
+	mptf_astar_output = (TF_Output*)malloc(sizeof(TF_Output) * NumOutputs);
+	mtf_astar_t2 = {TF_GraphOperationByName(mptf_astar_Graph, "StatefulPartitionedCall"), 0};
+	if(mtf_astar_t2.oper == NULL)
+		printf("ERROR: Failed TF_GraphOperationByName StatefulPartitionedCall\n");
+	else
+	printf("TF_GraphOperationByName StatefulPartitionedCall is OK\n");
+
+	mptf_astar_output[0] = mtf_astar_t2;
+
+	//*** allocate data for inputs & outputs
+	mpptf_astar_input_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumInputs);
+	mpptf_astar_output_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumOutputs);
+
+	//*** data allocation
+	mpf_astar_data = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 3 ];
+	mpf_astar_result = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 3 ];
+
+	// data handler
+	m_data_handler = ImageDataHandler( mn_processed_gmap_height, mn_processed_gmap_width, 0.5f );
+
+	ROS_INFO("model num classes: %d \n", mn_num_classes);
 
 }
 
@@ -232,6 +289,13 @@ FrontierDetectorDMS::~FrontierDetectorDMS()
 	free(mptf_fd_input);
 	delete [] mpf_fd_data ;
 	delete [] mpf_fd_result ;
+
+	free(mpptf_astar_input_values);
+	free(mpptf_astar_output_values);
+	free(mptf_astar_output);
+	free(mptf_astar_input);
+	delete [] mpf_astar_data ;
+	delete [] mpf_astar_result ;
 }
 
 void FrontierDetectorDMS::initmotion(  const float& fvx = 0.f, const float& fvy = 0.f, const float& ftheta = 1.f  )
@@ -921,17 +985,107 @@ cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", proc
 // DNN FFP detection
 ROS_INFO("begin DNN FR detection \n");
 
-	cv::Mat model_output = processed_gmap.clone();
-	run_tf_fr_detector_session(processed_gmap, model_output);
+	cv::Mat fr_img = processed_gmap.clone();
+	run_tf_fr_detector_session(processed_gmap, fr_img);
+cv::imwrite("/home/hankm/results/neuro_exploration_res/fr_out.png", fr_img);
 
-	cv::imwrite("/home/hankm/results/neuro_exploration_res/out.png", model_output);
+// get robot pose in the shifted gm image coordinate
+	cv::Point rpos_gm = world2gridmap( cv::Point2f( start.pose.position.x, start.pose.position.y ) ) ; 	// rpose in orig gm
+	rpos_gm = cv::Point( (rpos_gm.x + roi.x) / mn_scale, (rpos_gm.y + roi.y) / mn_scale ) ;  			// rpos in padded img --> rpos in ds img
 
-ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", model_output.rows, model_output.cols );
+cv::Mat tmp;
+cv::cvtColor( processed_gmap, tmp, cv::COLOR_GRAY2BGR);
+cv::circle(tmp, rpos_gm,  10, cv::Scalar(255,0,0), 1, 8, 0 );
+cv::imwrite("/home/hankm/results/neuro_exploration_res/out_rpose.png", tmp);
+
+	cv::Mat gmap_tform, fr_img_tform, astar_net_input ;
+
+	m_data_handler.transform_map_to_robotposition(fr_img, rpos_gm.x, rpos_gm.y, 0, fr_img_tform) ;  // tform fr_img
+	m_data_handler.transform_map_to_robotposition(processed_gmap, rpos_gm.x, rpos_gm.y, 127, gmap_tform) ;  // tform fr_img
+	cv::Mat gaussimg_32f = m_data_handler.GetGaussianImg();
+	m_data_handler.generate_astar_net_input(fr_img_tform, gmap_tform, gaussimg_32f, astar_net_input);
+//cv::Mat bgr[3] ;
+//split(astar_net_input, bgr) ;
+//cv::Mat I0,I1,I2, G ;
+//bgr[0].convertTo(I0, CV_8U, 255.f) ;
+//bgr[1].convertTo(I1, CV_8U, 255.f) ;
+//bgr[2].convertTo(I2, CV_8U, 255.f) ;
+//gaussimg_32f.convertTo(G, CV_8U, 255.f);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/img0.png", I0);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/img1.png", I1);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/img2.png", I2);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss.png", G);
+
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_tfrom.png", gmap_tform);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss_img.png", gaussimg_32f * 255.f);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input * 255.f);
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// 						run astar prediction
+//////////////////////////////////////////////////////////////////////////////////////////////
+ros::WallTime GPstartTime = ros::WallTime::now();
+	cv::Mat potmap_prediction ;
+	run_tf_astar_session( astar_net_input,  potmap_prediction) ;
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction);
+
+	// select an optimal frontier point
+	vector<cv::Point> optpt_cands;
+    locate_optimal_point_from_potmap( potmap_prediction, mn_num_classes-1, optpt_cands ) ;
+
+    vector<PointClass> potmap_points, potmap_points_tformed ;
+    assign_potmap_point_class( potmap_prediction, potmap_points);
+	// tform the opt frontier points
+	m_data_handler.inv_transform_point_to_robotposition( potmap_points, processed_gmap.rows, processed_gmap.cols,
+			 	 	 	 	 	 	 	 	 	 	 	 rpos_gm.x, rpos_gm.y, potmap_points_tformed); //optpt_cands_tformed ) ;
+
+	// The last tform to original coordinate
+	int xoffset = roi.x / mn_scale ; // roi is defined in max_global_height (1024)
+	int yoffset = roi.y / mn_scale ;
+ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
+	for( int jj=0; jj < potmap_points_tformed.size(); jj++)
+	{
+		potmap_points_tformed[jj].x = potmap_points_tformed[jj].x - xoffset ;
+		potmap_points_tformed[jj].y = potmap_points_tformed[jj].y - yoffset ;
+	}
+
+    vector<cv::Point> optpt_cands_tformed ;
+	for(int ii=0; ii < potmap_points_tformed.size(); ii++)
+	{
+		if(potmap_points_tformed[ii].label == mn_num_classes-1)
+		{
+			optpt_cands_tformed.push_back( cv::Point( potmap_points_tformed[ii].x, potmap_points_tformed[ii].y) );
+		}
+	}
+
+//	PointClassSet potmap_point_class( rgb(0.f, 0.f, 1.f), rgb(1.f, 1.f, 0.f), mn_num_classes ) ;
+//	for( int jj=0; jj < optpt_cands_tformed.size(); jj++)
+//	{
+//		int label =
+//		potmap_point_class.push_point(pc)
+//	}
+
+
+//cv::Mat im_tform_gray, im_tform;
+//im_tform_gray = cv::Mat::zeros(potmap_prediction.rows, potmap_prediction.cols, CV_8U);
+//for(int idx=0; idx < optpt_cands_tformed.size(); idx++)
+//{
+//	int lidx = optpt_cands_tformed[idx].x + processed_gmap.cols * optpt_cands_tformed[idx].y ;
+//	im_tform_gray.data[lidx] = 255;
+//}
+//cv::cvtColor(im_tform_gray, im_tform, cv::COLOR_GRAY2BGR);
+//cv::circle(im_tform, rpos_gm,  10, cv::Scalar(255,0,0), 1, 8, 0 );
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/tformed_back.png", im_tform);
+
+	// tranform potmap pixels back to the (non-center) robot's position
+
+//ROS_ASSERT(0);
+
+ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", fr_img.rows, fr_img.cols );
 // locate the most closest labeled points w.r.t the centroid pts
 
 	vector<vector<cv::Point> > model_output_contours; //, contours_plus_offset;
 	vector<cv::Vec4i> hierarchy;
-	cv::findContours( model_output, model_output_contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE );
+	cv::findContours( fr_img, model_output_contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE );
 
 #ifdef FD_DEBUG_MODE
 	string outfilename =  m_str_debugpath + "/global_mapimg.png" ;
@@ -943,11 +1097,16 @@ ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", model_output.rows, 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////// 		update unreachable frontiers;
 //////////////////////////////////////////////////////////////////////////////////////////////
-	updateUnreachablePointSet(  globalcostmap );
+	updateUnreachablePointSet( globalcostmap );
 	// init fr viz markers
 	visualization_msgs::Marker vizfrontier_regions;
 	vizfrontier_regions = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId,	1.f, 0.f, 0.f, 0.1);
 	vizfrontier_regions.type = visualization_msgs::Marker::POINTS;
+
+	visualization_msgs::Marker vizminpot_regions; // min astar distance regions
+	vizfrontier_regions = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId,	0.f, 1.f, 1.f, 0.1);
+	vizfrontier_regions.type = visualization_msgs::Marker::POINTS;
+
 	// init curr frontier point sets
 	{
 		const std::unique_lock<mutex> lock_prev(mutex_prev_frontier_set);
@@ -956,7 +1115,7 @@ ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", model_output.rows, 
 		// append valid previous frontier points after the sanity check
 		for (const auto & pi : m_prev_frontier_set)
 		{
-ROS_INFO("checking reachability %f %f \n", pi.p[0], pi.p[1] );
+//ROS_INFO("checking reachability %f %f \n", pi.p[0], pi.p[1] );
 			int ngmx = static_cast<int>( (pi.p[0] - globalcostmap.info.origin.position.x) / cmresolution ) ;
 			int ngmy = static_cast<int>( (pi.p[1] - globalcostmap.info.origin.position.y) / cmresolution ) ;
 			if( frontier_sanity_check(ngmx, ngmy, cmwidth, cmdata) ) //if( cmdata[ ngmy * cmwidth + ngmx ] == -1 )
@@ -969,106 +1128,64 @@ ROS_INFO("checking reachability %f %f \n", pi.p[0], pi.p[1] );
 			}
 		}
 	}
+ROS_INFO("done updating vizfrontiers \n");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Note that model_output_contours are found in DNN output img in which contains extra padding ( using roi ) to make fixed size: 512 512 img.
 // THe actual contours <contours_plus_offset> must be the ones found in actual gridmap (dynamic sized), thus we must remove the roi offset !!
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	int xoffset = roi.x / mn_scale ; // roi is defined in max_global_height (1024)
-	int yoffset = roi.y / mn_scale ;
-ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
+
+//	int xoffset = roi.x / mn_scale ; // roi is defined in max_global_height (1024)
+//	int yoffset = roi.y / mn_scale ;
 	vector<vector<cv::Point> > contours_plus_offset = model_output_contours;
-	for( int ii=0; ii < contours_plus_offset.size(); ii++ )
+//	for( int ii=0; ii < contours_plus_offset.size(); ii++ )
+//	{
+//		for( int jj=0; jj < contours_plus_offset[ii].size(); jj++)
+//		{
+//			contours_plus_offset[ii][jj].x = model_output_contours[ii][jj].x - xoffset ;
+//			contours_plus_offset[ii][jj].y = model_output_contours[ii][jj].y - yoffset ;
+//
+//			FrontierPoint oFRpoint( cv::Point(contours_plus_offset[ii][jj].x - ROI_OFFSET, contours_plus_offset[ii][jj].y - ROI_OFFSET), cmheight, cmwidth, m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
+//								   gmresolution, mn_numpyrdownsample );
+//
+//			geometry_msgs::Point point_w;
+//			point_w.x = oFRpoint.GetInitWorldPosition().x ;
+//			point_w.y = oFRpoint.GetInitWorldPosition().y ;
+//			vizfrontier_regions.points.push_back( point_w ) ;
+//		}
+//	}
+
+
+	for( int ii=0; ii < potmap_points_tformed.size(); ii++ )
 	{
-		for( int jj=0; jj < contours_plus_offset[ii].size(); jj++)
-		{
-			contours_plus_offset[ii][jj].x = model_output_contours[ii][jj].x - xoffset ;
-			contours_plus_offset[ii][jj].y = model_output_contours[ii][jj].y - yoffset ;
-		}
+		if (potmap_points_tformed[ii].label < mn_num_classes - 1)
+			continue;
+
+		FrontierPoint oFRpoint( cv::Point(potmap_points_tformed[ii].x - ROI_OFFSET, potmap_points_tformed[ii].y - ROI_OFFSET), cmheight, cmwidth,
+								m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x, gmresolution, mn_numpyrdownsample );
+		geometry_msgs::Point point_w;
+		point_w.x = oFRpoint.GetInitWorldPosition().x ;
+		point_w.y = oFRpoint.GetInitWorldPosition().y ;
+		vizfrontier_regions.points.push_back( point_w ) ;
 	}
+
 
 	if( contours_plus_offset.size() == 0 )
 	{
-		ROS_WARN("There is no frontier region in this map \n");
+		ROS_WARN("There is no more frontier region left in this map \n");
 
 		// we update/refresh the frontier points viz markers and publish them...
 		// we don't need to proceed to planning
 	}
 	else // We found fr, update append new points to m_curr_frontier_set accordingly
 	{
-		// To publish the FR found to Rviz
-//		FrontierPoint oFRpoint( cv::Point(contours_plus_offset[0][0].x, contours_plus_offset[0][0].y), cmheight, cmwidth, m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
-//							   gmresolution, mn_numpyrdownsample );
-
-		geometry_msgs::Point point_w;
-		vector<cv::Point> vecents_offset;  // shifted by the offet param
-		for(int i=0; i < contours_plus_offset.size(); i++)
-		{
-			int nx =0, ny =0 ;
-			int ncnt = 0 ;
-			vector<cv::Point> contour_plus_offset = contours_plus_offset[i];
-			for( int j=0; j < contour_plus_offset.size(); j++)
-			{
-
-				FrontierPoint oFRpoint( cv::Point(contour_plus_offset[j].x - ROI_OFFSET, contour_plus_offset[j].y - ROI_OFFSET), cmheight, cmwidth, m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
-									   gmresolution, mn_numpyrdownsample );
-
-				point_w.x = oFRpoint.GetInitWorldPosition().x ;
-				point_w.y = oFRpoint.GetInitWorldPosition().y ;
-				vizfrontier_regions.points.push_back( point_w ) ;
-
-				nx += contour_plus_offset[j].x ;
-				ny += contour_plus_offset[j].y ;
-
-//ROS_INFO("%d %d /\ %d %d \n", model_output_contours[i][j].x, model_output_contours[i][j].y, contour_plus_offset[j].x, contour_plus_offset[j].y );
-
-				ncnt += 1;
-			}
-			int ncx = nx / ncnt ;
-			int ncy = ny / ncnt ;
-
-			cv::Point ncent( ncx,  ncy ) ;
-			vecents_offset.push_back( ncent );
-		}
-
-		CV_Assert( contours_plus_offset.size() == vecents_offset.size() );
-		// get closest frontier pt to each cent
-		// i.e.) the final estimated frontier points
 		vector<FrontierPoint> voFrontierCands;
 
-		for( int i = 0; i < contours_plus_offset.size(); i++ )
+		for( int i = 0; i < optpt_cands_tformed.size(); i++ )
 		{
-			vector<cv::Point> contour_plus_offset = contours_plus_offset[i] ;
-			if(contour_plus_offset.size() < m_frontiers_region_thr ) // don't care about small frontier regions
-				continue ;
-
-			int ncentx_offset = vecents_offset[i].x ;
-			int ncenty_offset = vecents_offset[i].y ;
-
-			int nmindist = 10000000 ;
-			int nmindistidx = -1;
-
-			for (int j=0; j < contour_plus_offset.size(); j++)
-			{
-				int nx = contour_plus_offset[j].x ;
-				int ny = contour_plus_offset[j].y ;
-				int ndist = std::sqrt( (nx - ncentx_offset) * (nx - ncentx_offset) + (ny - ncenty_offset) * (ny - ncenty_offset) );
-				if(ndist < nmindist)
-				{
-					nmindist = ndist ;
-					nmindistidx = j ;
-				}
-			}
-
-			CV_Assert(nmindistidx >= 0);
-			cv::Point frontier_offset = contour_plus_offset[nmindistidx];
-
-			//ROS_WARN(" %d %d \n", frontier_offset.x, frontier_offset.y);
-
 			cv::Point frontier ; // frontier points found in the down-sampled map image.
-			frontier.x = frontier_offset.x - ROI_OFFSET ;
-			frontier.y = frontier_offset.y - ROI_OFFSET ;
-//ROS_INFO("biased FR and FR: %d %d/  %d %d\n", frontier.x, frontier.y, frontier.x-roi.x, frontier.y - roi.y);
+			frontier.x = optpt_cands_tformed[i].x - ROI_OFFSET ;  // optpt is defined in DS image, so we need to upsample the point back
+			frontier.y = optpt_cands_tformed[i].y - ROI_OFFSET ;
 			FrontierPoint oPoint( frontier, cmheight, cmwidth,
 									m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
 						   gmresolution, mn_numpyrdownsample );
@@ -1079,7 +1196,6 @@ ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
 			cv::Point init_pt 		= oPoint.GetInitGridmapPosition() ; 	// position @ ds0 (original sized map)
 			cv::Point corrected_pt	= oPoint.GetCorrectedGridmapPosition() ;
 			correctFrontierPosition( m_gridmap, init_pt, mn_correctionwindow_width, corrected_pt  );
-//ROS_INFO("init/corr point: %d %d %d %d\n", init_pt.x, init_pt.y, corrected_pt.x, corrected_pt.y );
 			oPoint.SetCorrectedCoordinate(corrected_pt); // frontiers in up-scaled (orig img coord) image
 			voFrontierCands.push_back(oPoint);
 		}
@@ -1094,14 +1210,17 @@ ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
 		{
 ROS_ERROR("getting error here in conf measure fn b/c costmap size is downsampled \n");
 			mo_frontierfilter.measureCostmapConfidence(globalcostmap, voFrontierCands);
+ROS_INFO("done CM filter \n");
 			mo_frontierfilter.measureGridmapConfidence(m_gridmap, voFrontierCands);
+ROS_INFO("done GM filter \n");
+
 			for(size_t idx=0; idx < voFrontierCands.size(); idx++)
 			{
 				cv::Point frontier_in_gm = voFrontierCands[idx].GetCorrectedGridmapPosition();
-				//bool bisexplored = false; //is_explored(frontier_in_gm.x, frontier_in_gm.y, gmwidth, gmdata) ;
+				bool bisfrontier = is_frontier_point(frontier_in_gm.x, frontier_in_gm.y, cmwidth, cmheight, gmdata );
 				int gmidx = cmwidth * frontier_in_gm.y	+	frontier_in_gm.x ;
 				bool bisexplored = cmdata[gmidx] >=0 ? true : false ;
-				voFrontierCands[idx].SetFrontierFlag( fcm_conf, fgm_conf, bisexplored );
+				voFrontierCands[idx].SetFrontierFlag( fcm_conf, fgm_conf, bisexplored, bisfrontier );
 
 //ROS_INFO("%f %f %d %d\n", voFrontierCands[idx].GetInitWorldPosition().x, voFrontierCands[idx].GetInitWorldPosition().y,
 //						  voFrontierCands[idx].GetCorrectedGridmapPosition().x, voFrontierCands[idx].GetCorrectedGridmapPosition().y);
@@ -1149,9 +1268,41 @@ ROS_ERROR("getting error here in conf measure fn b/c costmap size is downsampled
 	ROS_INFO(" The num of tot frontier points left :  %d\n", m_curr_frontier_set.size() );
 	//frontier_summary( voFrontierCands );
 
-	publishFrontierPointMarkers( ) ;
+	//publishFrontierPointMarkers( ) ;
 	publishFrontierRegionMarkers ( vizfrontier_regions );
-	if( m_curr_frontier_set.empty() ) // terminating condition
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 		generate a path trajectory
+// 		call make plan service
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ROS_INFO(" FR is found let's start the make plan service \n");
+
+///////////////////////////////////////////////////////////////////////
+// 1. estimate dist to each goal using euclidean distance heuristic (we need sorting here)
+///////////////////////////////////////////////////////////////////////
+	float fstartx = static_cast<float>( start.pose.position.x ) ;
+	float fstarty = static_cast<float>( start.pose.position.y ) ;
+
+//////////////////////////////////////////////////////////////////////////////////
+// 2. use the fp corresponds to the min distance as the init fp. epsilon = A*(fp)
+// 	i)  We first sort fpts based on their euc heuristic(), then try makePlan() for each of fpts in turn.
+// 	ii) We need to sort them b/c the one with best heuristic could fail
+//////////////////////////////////////////////////////////////////////////////////
+
+	geometry_msgs::PoseStamped goal;
+	nav_msgs::Path msg_frontierpoints ;
+	for( const auto & pi : m_curr_frontier_set)
+	{
+		geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
+		tmp_goal.header.frame_id = m_worldFrameId ;
+
+		float fdist_sq = (start.pose.position.x - tmp_goal.pose.position.x ) * ( start.pose.position.y - tmp_goal.pose.position.y ) ;
+		float fdist = sqrt(fdist_sq);
+		if (fdist > 1.f)
+			msg_frontierpoints.poses.push_back(tmp_goal);
+	}
+
+	if( m_curr_frontier_set.empty() || msg_frontierpoints.poses.size() == 0 ) // terminating condition
 	{
 		ROS_WARN("no more valid frontiers \n");
 		// delete markers
@@ -1169,133 +1320,10 @@ ROS_ERROR("getting error here in conf measure fn b/c costmap size is downsampled
 		return;
 	}
 
-#ifdef FFD_DEBUG_MODE
-		imwrite(m_str_debugpath+"/frontier_cents.png", dst);
-#endif
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 		generate a path trajectory
-// 		call make plan service
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-ROS_INFO(" FR is found let's start the make plan service \n");
-
-	//ROS_INFO("resizing mpo_costmap \n");
-	mpo_costmap->resizeMap( 	cmwidth, cmheight, cmresolution,
-								cmstartx, cmstarty );
-	//ROS_INFO("mpo_costmap has been reset \n");
-	unsigned char* pmap = mpo_costmap->getCharMap() ;
-	//ROS_INFO("w h datlen : %d %d %d \n", cmwidth, cmheight, cmdata.size() );
-
-	for(uint32_t ridx = 0; ridx < cmheight; ridx++)
-	{
-		for(uint32_t cidx=0; cidx < cmwidth; cidx++)
-		{
-			uint32_t idx = ridx * cmwidth + cidx ;
-			signed char val = cmdata[idx];
-			pmap[idx] = val < 0 ? 255 : mp_cost_translation_table[val];
-		}
-	}
-
-///////////////////////////////////////////////////////////////////////
-// 1. estimate dist to each goal using euclidean distance heuristic (we need sorting here)
-///////////////////////////////////////////////////////////////////////
-	float fstartx = static_cast<float>( start.pose.position.x ) ;
-	float fstarty = static_cast<float>( start.pose.position.y ) ;
-	float fmindist = DIST_HIGH ;
-	size_t min_heuristic_idx = 0;
-
-//////////////////////////////////////////////////////////////////////////////////
-// 2. use the fp corresponds to the min distance as the init fp. epsilon = A*(fp)
-// 	i)  We first sort fpts based on their euc heuristic(), then try makePlan() for each of fpts in turn.
-// 	ii) We need to sort them b/c the one with best heuristic could fail
-//////////////////////////////////////////////////////////////////////////////////
-#ifdef DEBUG_MODE
-	static int ndebugframeidx = 0;
-	// 1. save cost-map
-	string strofs_mpbb = (boost::format("%s/mpbb_state%04d.txt") % m_str_debugpath % ndebugframeidx ).str() ;
-	ofstream ofs_mpbb(strofs_mpbb) ;
-#endif
-
-	alignas(64) float fupperbound ;
-	alignas(64) size_t best_idx;
-	//alignas(64) float fXbest ;
-	//alignas(64) float fYbest ;
-
-	std::vector<geometry_msgs::PoseStamped> initplan;
-	fupperbound = static_cast<float>(DIST_HIGH) ;
-	best_idx	= static_cast<size_t>(0) ;
-
-///////////////////////// /////////////////////////////////////////////////////////
-// 3. Do BB based openmp search
-//////////////////////////////////////////////////////////////////////////////////
-
-	float fendpot = 0.f; //POT_HIGH;
-	vector< uint32_t > gplansizes( m_curr_frontier_set.size(), 0 ) ;
-
-	GlobalPlanningHandler o_gph( *mpo_costmap, m_worldFrameId, m_baseFrameId, mb_allow_unknown );
-	std::vector<geometry_msgs::PoseStamped> plan;
-	std::vector<geometry_msgs::PoseStamped> best_plan;
-	uint32_t fptidx;
-	int tid;
-	geometry_msgs::PoseStamped goal;
-	nav_msgs::Path msg_frontierpoints ;
-
-	for( const auto & pi : m_curr_frontier_set)
-	{
-		geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
-		tmp_goal.header.frame_id = m_worldFrameId ;
-		msg_frontierpoints.poses.push_back(tmp_goal);
-	}
-
-ros::WallTime GPstartTime = ros::WallTime::now();
-
-omp_set_num_threads(mn_numthreads);
-omp_init_lock(&m_mplock);
-
-ROS_INFO("begining BB A*\n");
-	#pragma omp parallel firstprivate( o_gph, msg_frontierpoints, plan, tid, start, goal, fendpot ) shared( fupperbound,  best_idx)
-	{
-
-		#pragma omp for
-		//for (const auto & pi : m_valid_frontier_set)
-		for( fptidx=0; fptidx < msg_frontierpoints.poses.size() ; fptidx++)
-		{
-			tid = omp_get_thread_num() ;
-
-	//ROS_INFO("processing (%f %f) with thread %d/%d : %d", p.x, p.y, omp_get_thread_num(), omp_get_num_threads(), idx );
-			//fendpot = POT_HIGH ;
-			//fendpot = 0.f;
-			o_gph.reinitialization( ) ;
-			geometry_msgs::PoseStamped goal = msg_frontierpoints.poses[fptidx];
-			goal.header.frame_id = m_worldFrameId ;
-	//ROS_INFO("goal: %f %f \n", fpoints[fptidx].x, fpoints[fptidx].y );
-
-			int bplansuccess = o_gph.makePlan( tid, fupperbound, false, start, goal, plan, fendpot);
-ROS_INFO("plan to goal: %f %f status %d \n", goal.pose.position.x, goal.pose.position.y, bplansuccess );
-#ifdef DEBUG_MODE
-			{
-				omp_set_lock(&m_mplock);
-				cv::Point goal_gm = world2gridmap(cv::Point2f(goal.pose.position.x, goal.pose.position.y)) ;
-
-				ofs_mpbb << "[tid "<<tid <<"] ["<<bplansuccess << "] processed " << fptidx << " th point (" << start_gm.x << ", " << start_gm.y << ") to (" <<
-														goal_gm.x << ", " << goal_gm.y << ") marked \t" << fendpot << " / " << fupperbound << " potential \n " << endl;
-				omp_unset_lock(&m_mplock);
-			}
-#endif
-
-			if( fendpot > 0 && fendpot < fupperbound  )
-			{
-				omp_set_lock(&m_mplock);
-				fupperbound = fendpot; // set new bound;
-				best_idx = fptidx;
-				best_plan = plan;
-				omp_unset_lock(&m_mplock);
-			}
-		}
-	}
-ROS_INFO("Finishing BB A*\n");
+ROS_INFO(" got valid frontier points \n");
 ros::WallTime GPendTime = ros::WallTime::now();
 double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
+
 
 	// publish goalexclusive fpts
 	int tmpcnt = 0;
@@ -1305,7 +1333,7 @@ double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 	goalexclusivefpts.header.stamp = ros::Time::now();
 	for (const auto & pi : m_curr_frontier_set)
 	{
-		if (tmpcnt != best_idx)
+		if (tmpcnt != 0)
 		{
 			geometry_msgs::PoseStamped fpt = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f ) ;
 			fpt.header.frame_id = m_worldFrameId ;
@@ -1314,10 +1342,15 @@ double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 		}
 		tmpcnt++;
 	}
-	//cv::Point2f cvbestgoal = cvgoalcands[best_idx] ;  // just for now... we need to fix it later
-	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[best_idx] ; //ps.p[0], ps.p[1], 0.f );
+
+ROS_INFO(" done here 1 \n");
+
+//cv::Point2f cvbestgoal = cvgoalcands[best_idx] ;  // just for now... we need to fix it later
+//	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[best_idx] ; //ps.p[0], ps.p[1], 0.f );
 
 // if the best frontier point is the same as the previous frontier point, we need to set a different goal
+ROS_INFO(" msg_frontierpoint size: %d \n", msg_frontierpoints.poses.size() );
+	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[0] ; //ps.p[0], ps.p[1], 0.f );
 
 	// check for ocsillation
 	float fdist2prevposition = euc_dist( cv::Point2f( m_previous_robot_pose.pose.position.x, m_previous_robot_pose.pose.position.y ), cv::Point2f( start.pose.position.x, start.pose.position.y ) ) ;
@@ -1325,6 +1358,7 @@ double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 	{
 		m_last_oscillation_reset = ros::Time::now();
 	}
+ROS_INFO(" done here 2 \n");
 
 	bool bisocillating = (m_last_oscillation_reset + ros::Duration(8.0) < ros::Time::now() );
 	if( bisocillating ) // first check for oscillation
@@ -1389,39 +1423,20 @@ ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n
 		m_previous_goal = m_targetgoal ;
 	}
 
+ROS_INFO(" done here 2 \n");
 
 //////////////////////////////////////////////////////////////////////////////
 // 						Publish frontier pts to Rviz						//
 //////////////////////////////////////////////////////////////////////////////
-
-	// refresh fpts in Rviz
-//	publishFrontierPointMarkers( );
-//	publishFrontierRegionMarkers ( vizfrontier_regions );
-
-#ifdef DEBUG_MODE
-//	static int ndebugframeidx = 0;
-	// 1. save cost-map
-	string strcostmap = (boost::format("%s/costmap%04d.txt") % m_str_debugpath % ndebugframeidx ).str() ;
-	string strcminfo  = (boost::format("%s/cminfo%04d.txt" ) % m_str_debugpath % ndebugframeidx ).str() ;
-	saveMap( globalcostmap, strcminfo, strcostmap );
-
-	// 2. save frontier points / planning res
-	string strfrontierfile = (boost::format("%s/frontier%04d.txt") % m_str_debugpath % ndebugframeidx ).str() ;
-
-	// publish fpts to Rviz
-	saveFrontierPoints( globalcostmap, msg_frontierpoints, best_idx, strfrontierfile  );
-	// 3. save planning res
-
-
-	ndebugframeidx++ ;
-#endif
-
 	{
 		const std::unique_lock<mutex> lock(mutex_robot_state) ;
 		me_robotstate = ROBOT_STATE::ROBOT_IS_READY_TO_MOVE;
 	}
+ROS_INFO(" done here 3 \n");
 
 	updatePrevFrontierPointsList( ) ;
+ROS_INFO(" done here 4 \n");
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Lastly we publish the goal and other frontier points ( hands over the control to move_base )
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1493,45 +1508,125 @@ void FrontierDetectorDMS::run_tf_fr_detector_session( const cv::Mat& input_map, 
 
 void FrontierDetectorDMS::run_tf_astar_session( const cv::Mat& input_map, cv::Mat& model_output)
 {
-//	memset( mpf_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
-//	memset( mpf_result, 0.f, input_map.cols * input_map.rows*sizeof(float) );
-//
-//    for(int ridx=0; ridx < input_map.rows; ridx++)
-//    {
-//    	for(int cidx=0; cidx < input_map.cols; cidx++)
-//    	{
-//    		int lidx = ridx * input_map.cols + cidx ;
-//    		mpf_data[lidx] = static_cast<float>(input_map.data[lidx]) / 255.f   ;
-//    	}
-//    }
-//    const int ndata = sizeof(float)*1*input_map.rows*input_map.cols*1 ;
-//    const int64_t dims[] = {1, input_map.rows, input_map.cols, 1};
-//    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_data, ndata, &NoOpDeallocator, 0);
-//    if (int_tensor != NULL)
-//    {
-//    	ROS_INFO("TF_NewTensor is OK\n");
-//    }
-//    else
-//    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
-//
-//    mpptf_input_values[0] = int_tensor;
-//    // //Run the Session
-//    TF_SessionRun(mptf_Session, NULL, mptf_input, mpptf_input_values, 1, mptf_output, mpptf_output_values, 1, NULL, 0, NULL, mptf_Status);
-//    if(TF_GetCode(mptf_Status) == TF_OK)
-//    {
-//    	ROS_INFO("Session is OK\n");
-//    }
-//    else
-//    {
-//    	ROS_INFO("%s",TF_Message(mptf_Status));
-//    }
-//
-//    cv::Mat res_32F(512, 512, CV_32FC1, TF_TensorData(*mpptf_output_values));
-//	double minVal, maxVal;
-//	cv::minMaxLoc( res_32F, &minVal, &maxVal );
-////	printf("max min: %f %f\n", maxVal, minVal);
-//	model_output = ( res_32F > maxVal * 0.3 ) * 255 ;
+	int nheight = input_map.rows ;
+	int nwidth  = input_map.cols ;
+	int nchannels = input_map.channels() ;
+	int nclasses = mn_num_classes ;
+
+	memset( mpf_astar_data, 0.f, nheight * nwidth * nchannels * sizeof(float) );
+//	memset( mpf_astar_result, 0.f, nheight * nwidth * nchannels * sizeof(float) );
+
+	// C H W style { i.e.) depth first then shift to right }
+	for(int ridx=0; ridx < nheight; ridx++)
+	{
+		for(int cidx=0; cidx < nwidth; cidx++)
+		{
+			//int lidx = ridx * 512 * 3 + cidx * NUM_CLASSES + chidx ;
+			//int lidx = ridx * 512 + cidx + 512 * 512 * chidx ;
+			float c0 = input_map.at<cv::Vec3f>(ridx, cidx)[0]   ;
+			float c1 = input_map.at<cv::Vec3f>(ridx, cidx)[1]   ;
+			float c2 = input_map.at<cv::Vec3f>(ridx, cidx)[2]   ;
+
+			int idx0 = ridx * nheight * nchannels + cidx * nchannels + 0  ;
+			int idx1 = ridx * nheight * nchannels + cidx * nchannels + 1  ;
+			int idx2 = ridx * nheight * nchannels + cidx * nchannels + 2 ;
+			mpf_astar_data[idx0] = c0 ;
+			mpf_astar_data[idx1] = c1 ;
+			mpf_astar_data[idx2] = c2 ;
+		}
+	}
+
+    const int ndata = sizeof(float)*1*input_map.rows * input_map.cols * input_map.channels() ;
+    const int64_t dims[] = {1, input_map.rows, input_map.cols, input_map.channels()};
+    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_astar_data, ndata, &NoOpDeallocator, 0);
+    if (int_tensor != NULL)
+    {
+    	ROS_INFO("TF_NewTensor is OK\n");
+    }
+    else
+    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
+
+    mpptf_astar_input_values[0] = int_tensor;
+    // //Run the Session
+    TF_SessionRun(mptf_astar_Session, NULL, mptf_astar_input, mpptf_astar_input_values, 1, mptf_astar_output, mpptf_astar_output_values, 1, NULL, 0, NULL, mptf_astar_Status);
+    if(TF_GetCode(mptf_astar_Status) == TF_OK)
+    {
+    	ROS_INFO("Session is OK\n");
+    }
+    else
+    {
+    	ROS_INFO("%s",TF_Message(mptf_astar_Status));
+    }
+
+	void* buff = TF_TensorData(mpptf_astar_output_values[0]);
+	float* offsets = (float*)buff;
+
+	model_output = cv::Mat::zeros(nheight, nwidth, CV_8U);
+
+	// C H W style
+	for (int ridx = 0; ridx < nheight; ++ridx)
+	{
+		for (int cidx = 0; cidx < nwidth; ++cidx)
+		{
+			int max_idx = -1;
+			float max_val = -FLT_MAX;
+
+			for(int chidx=0; chidx < nclasses; chidx++)	// hard coded for now...
+			{
+				int idx = ridx * nheight * nclasses + cidx * nclasses + chidx ;
+				float val = offsets[idx] ;
+				if (val > max_val)
+				{
+					max_val = val;
+					max_idx = chidx;
+				}
+				//tmp.at<float>(ridx, cidx) = val ;
+			}
+			model_output.data[ridx*nheight + cidx] = max_idx ;
+		}
+	}
 }
+
+int FrontierDetectorDMS::locate_optimal_point_from_potmap( const cv::Mat& input_potmap, const uint8_t& optVal, vector<cv::Point>& points   )
+{
+	//cv::Mat optFR = input_potmap == optVal ;
+	int nheight = input_potmap.rows ;
+	int nwidth = input_potmap.cols ;
+	int ncnt = 0;
+	for( int ii = 0; ii < nheight; ii++ )
+	{
+		for(int jj =0; jj < nwidth; jj++)
+		{
+			int idx = nwidth * ii + jj ;
+			if( input_potmap.data[ idx ] == optVal )
+			{
+				points.push_back(cv::Point(jj,ii));
+				ncnt++;
+			}
+		}
+	}
+	return ncnt ;
+}
+
+int FrontierDetectorDMS::assign_potmap_point_class( const cv::Mat& input_potmap, vector<PointClass>& points   )
+{
+	//cv::Mat optFR = input_potmap == optVal ;
+	int nheight = input_potmap.rows ;
+	int nwidth = input_potmap.cols ;
+	int ncnt = 0;
+	for( int ii = 0; ii < nheight; ii++ )
+	{
+		for(int jj =0; jj < nwidth; jj++)
+		{
+			int idx = nwidth * ii + jj ;
+			uint8_t label = input_potmap.data[ idx ];
+			points.push_back( PointClass(jj, ii, (int)label) );
+			ncnt++;
+		}
+	}
+	return ncnt ;
+}
+
 
 
 void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal,

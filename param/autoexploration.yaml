@@ -12,6 +12,8 @@ autoexplorer:
     unreachable_decision_bound:   0.3 # < 4 * 0.05 res >
     strict_unreachable_decision: true  # make it true if there are several obstacles in the space that blocks the robot to traverse around. true helps if there is frontier point detected beyond the wall (cannot traverse to there). Mostly "true" in real world/ noisy env, but might want to set to "false" in the simulation env where no obs in the space. 
 tf_loader:
-    modelfilepath:           '/home/hankm/results/neuro_globalplan_res/fr_detection/base_model'
+    fd_model_filepath:      '/home/hankm/results/neuro_globalplan_res/fr_detection/base_model'
+    astar_model_filepath:   '/home/hankm/results/neuro_globalplan_res/pathlen_estimator/base_model'
     max_gmap_height:        512
     max_gmap_width:         512
+    num_classes:            8

@@ -129,13 +129,11 @@ ROS_INFO("origin in costmap: %f %f\n", fXstart, fXstart );
 		int ex = MIN(px_c + mn_costmap_roi_size, width) ;
 		int sy = MAX(py_c - mn_costmap_roi_size, 0);
 		int ey = MIN(py_c + mn_costmap_roi_size, height) ;
-//ROS_INFO("cm test window: %d %d %d %d \n", sx, ex, sy, ey);
+ROS_INFO("cm test window: %d %d %d %d \n", sx, ex, sy, ey);
+ROS_INFO("cm size: %d %d px_c py_c %d %d roi_size: %d\n", width, height, px_c, py_c, mn_costmap_roi_size);
 		//ofs_fpc << px_c << " " << py_c << endl;
 
-#ifdef FD_DEBUG_MODE
-#endif
-
-		cv::Mat roi = cv::Mat::zeros(ey - sy + 1, ex - sx + 1, CV_8S);
+		//cv::Mat roi = cv::Mat::zeros(ey - sy + 1, ex - sx + 1, CV_8S); <=== causing bugs...
 
 		int cellcnt = 0;
 		int totcost = 0;
@@ -150,22 +148,13 @@ ROS_INFO("origin in costmap: %f %f\n", fXstart, fXstart );
 				//if(cost >= 0 )// m_nlethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
 				if(cost >  mn_lethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
 				{
-					//ncost++;
-					//totcost += static_cast<int>(cost);
 					totcost += 1;
 				}
-#ifdef FD_DEBUG_MODE
-	ofs_fptroi << cost << " ";
-#endif
 				//roi.data[ ridx * width + cidx ] = cost ;
 				cellcnt++;
 			}
-
-#ifdef FD_DEBUG_MODE
-	ofs_fptroi << endl;
-#endif
-
 		}
+ROS_INFO("done counting the cost \n");
 		float fcost = static_cast<float>(totcost) / static_cast<float>( cellcnt )  ;
 		float fcm_conf = 1.f - std::sqrt( fcost ) ;
 		voFrontierCandidates[idx].SetCostmapConfidence(fcm_conf);
@@ -210,7 +199,7 @@ void FrontierFilter::measureGridmapConfidence( const nav_msgs::OccupancyGrid& gr
 		int ey = MIN(py_g + mn_gridmap_roi_size, height) ;
 
 //ROS_INFO(" idx px py %u %d %d\n", idx, px_c, py_c);
-		cv::Mat roi = cv::Mat::zeros(ey - sy + 1, ex - sx + 1, CV_8S);
+		//cv::Mat roi = cv::Mat::zeros(ey - sy + 1, ex - sx + 1, CV_8S); <== causing error
 
 		int cellcnt = 0;
 		int unkncnt = 0;
