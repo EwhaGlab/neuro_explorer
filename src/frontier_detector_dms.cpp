@@ -53,13 +53,21 @@ mp_cost_translation_table(NULL),
 mb_strict_unreachable_decision(true),
 me_prev_exploration_state( SUCCEEDED ), mb_nbv_selected(false), //, mn_prev_nbv_posidx(-1)
 mb_allow_unknown(true),
-mn_mapcallcnt(0), mf_avgcallbacktime_msec(0.f), mf_avgplanngtime_msec(0.f), mf_totalcallbacktime_msec(0.f), mf_totalplanningtime_msec(0.f),
+mn_mapcallcnt(0), mn_moverobotcnt(0),
+mf_totalcallbacktime_msec(0.f), mf_totalffptime_msec(0.f), 	mf_totalplanningtime_msec(0.f), mf_totalmotiontime_msec(0.f),
+mf_avgcallbacktime_msec(0.f), 	mf_avgffptime_msec(0.f), 	mf_avgplanngtime_msec(0.f), 	mf_avgmotiontime_msec(0.f),
+mf_avg_fd_sessiontime_msec(0.f), mf_total_fd_sessiontime_msec(0.f),
+mf_avg_astar_sessiontime_msec(0.f), mf_total_astar_sessiontime_msec(0.f),
 mn_num_classes(8)
 {
+	m_ae_start_time = ros::WallTime::now();
+
 	float fcostmap_conf_thr, fgridmap_conf_thr; // mf_unreachable_decision_bound ;
 	int nweakcomp_threshold ;
 
 	m_nh.getParam("/autoexplorer/debug_data_save_path", m_str_debugpath);
+	m_nh.getParam("/autoexplorer/ne_report_file", mstr_report_filename);
+
 	m_nh.param("/autoexplorer/costmap_conf_thr", fcostmap_conf_thr, 0.1f);
 	m_nh.param("/autoexplorer/gridmap_conf_thr", fgridmap_conf_thr, 0.8f);
 	m_nh.param("/autoexplorer/occupancy_thr", mn_occupancy_thr, 50);
@@ -171,6 +179,11 @@ mn_num_classes(8)
 	m_startmsgPub.publish( begin_task );
 
 	m_last_oscillation_reset = ros::Time::now();
+
+	// open ae report file
+	string str_ae_report_file = m_str_debugpath + "/" + mstr_report_filename ;
+ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
+	m_ofs_ae_report = ofstream( str_ae_report_file );
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // tf FD model
@@ -421,7 +434,35 @@ bool FrontierDetectorDMS::isValidPlan( vector<cv::Point>  )
 void FrontierDetectorDMS::publishDoneExploration( )
 {
 	double favg_callback_time = mf_totalcallbacktime_msec / (double)(mn_mapcallcnt) ;
+
+	double favg_ffp_time = mf_totalffptime_msec / (double)(mn_mapcallcnt) ;
+	double favg_fd_session_time = mf_total_fd_sessiontime_msec / (double)(mn_mapcallcnt) ;
+
 	double favg_planning_time = mf_totalplanningtime_msec / (double)(mn_mapcallcnt) ;
+	double favg_astar_session_time = mf_total_astar_sessiontime_msec / (double)(mn_mapcallcnt) ;
+
+	double favg_moverobot_time = mf_totalmotiontime_msec / (double)(mn_moverobotcnt) ;
+
+	ros::WallTime ae_end_time = ros::WallTime::now();
+	double total_exploration_time = (ae_end_time - m_ae_start_time ).toNSec() * 1e-6;
+
+
+
+	m_ofs_ae_report << "******************* exploration report ************************" << endl;
+	m_ofs_ae_report << "total num of mapcallback         : " << mn_mapcallcnt << endl;
+	m_ofs_ae_report << "total num of move robot cnt      : " << mn_moverobotcnt << endl;
+	m_ofs_ae_report << "tot / avg callback time     (ms) : " << mf_totalcallbacktime_msec << "\t" << favg_callback_time  << endl;
+
+	m_ofs_ae_report << "tot / avg fr pred time 	    (ms) : " << mf_totalffptime_msec << "\t" << favg_ffp_time  << endl;
+	m_ofs_ae_report << "tot / avg fr session time   (ms) : " << mf_total_fd_sessiontime_msec << "\t" << favg_fd_session_time  << endl;
+
+	m_ofs_ae_report << "tot / avg potmap pred time  (ms) : " << mf_totalplanningtime_msec << "\t" << favg_planning_time  << endl;
+	m_ofs_ae_report << "tot / avg A* session time   (ms) : " << mf_total_astar_sessiontime_msec << "\t" << favg_astar_session_time  << endl;
+
+	m_ofs_ae_report << "tot / avg motion time       (s)  : " << mf_totalmotiontime_msec / 1000.0 << "\t" << favg_moverobot_time / 1000.0 << endl;
+	m_ofs_ae_report << endl;
+	m_ofs_ae_report << "total exploration time      (s)  : " << total_exploration_time / 1000.0 << endl;
+	m_ofs_ae_report.close();
 
 	ROS_INFO("total map data callback counts : %d \n", mn_mapcallcnt  );
 	ROS_INFO("total callback time (sec) %f \n", mf_totalcallbacktime_msec / 1000 );
@@ -872,8 +913,8 @@ ROS_INFO("got costmap size of %d %d \n", m_globalcostmap.info.height, m_globalco
 	cv::Rect roi( mn_roi_origx, mn_roi_origy, cmwidth, cmheight );
 
 	//mcvu_mapimgroi = mcvu_mapimg(roi);
-ROS_INFO("roi: %d %d %d %d \n", mn_roi_origx, mn_roi_origy, cmwidth, cmheight );
-ROS_INFO("ox oy: %f %f \n", globalcostmap.info.origin.position.x, globalcostmap.info.origin.position.y) ;
+//ROS_INFO("roi: %d %d %d %d \n", mn_roi_origx, mn_roi_origy, cmwidth, cmheight );
+//ROS_INFO("ox oy: %f %f \n", globalcostmap.info.origin.position.x, globalcostmap.info.origin.position.y) ;
 	for( int ii =0 ; ii < cmheight; ii++)
 	{
 		for( int jj = 0; jj < cmwidth; jj++)
@@ -898,7 +939,7 @@ ROS_INFO("ox oy: %f %f \n", globalcostmap.info.origin.position.x, globalcostmap.
 		}
 	}
 
-ROS_INFO("mcvu_mapimg has been processed %d %d \n", mcvu_mapimg.rows, mcvu_mapimg.cols );
+//ROS_INFO("mcvu_mapimg has been processed %d %d \n", mcvu_mapimg.rows, mcvu_mapimg.cols );
 
 // process costmap
 	for( int ii =0 ; ii < cmheight; ii++)
@@ -969,13 +1010,8 @@ ROS_INFO("roi info: <%d %d %d %d> \n", roi.x, roi.y, roi.width, roi.height) ;
 
 	geometry_msgs::PoseStamped start = GetCurrRobotPose( );
 
-	//int ngmx, ngmy;
-	//world_to_scaled_gridmap( start.pose.position.x, start.pose.position.y, cmstartx, cmstarty, gmresolution, mn_scale, ngmx, ngmy) ;
-
-// ROS_INFO(" innner seed (%d %d)  map size: (%d %d)\n", ngmx, ngmy, img_plus_offset.rows, img_plus_offset.cols);
-
-cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_pad.png", mcvu_mapimg);
-cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_pad.png", mcvu_mapimg);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
 
 //	dffp::FrontPropagation oFP(img_plus_offset); // image uchar
 //	oFP.update(img_plus_offset, cv::Point(ngmx,ngmy), cv::Point(0,0) );
@@ -986,17 +1022,22 @@ cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", proc
 ROS_INFO("begin DNN FR detection \n");
 
 	cv::Mat fr_img = processed_gmap.clone();
+
+ros::WallTime GFFPstartTime = ros::WallTime::now();
 	run_tf_fr_detector_session(processed_gmap, fr_img);
-cv::imwrite("/home/hankm/results/neuro_exploration_res/fr_out.png", fr_img);
+ros::WallTime GFFPendTime = ros::WallTime::now();
+double ffp_time = (GFFPendTime - GFFPstartTime ).toNSec() * 1e-6;
+
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/fr_out.png", fr_img);
 
 // get robot pose in the shifted gm image coordinate
 	cv::Point rpos_gm = world2gridmap( cv::Point2f( start.pose.position.x, start.pose.position.y ) ) ; 	// rpose in orig gm
 	rpos_gm = cv::Point( (rpos_gm.x + roi.x) / mn_scale, (rpos_gm.y + roi.y) / mn_scale ) ;  			// rpos in padded img --> rpos in ds img
 
-cv::Mat tmp;
-cv::cvtColor( processed_gmap, tmp, cv::COLOR_GRAY2BGR);
-cv::circle(tmp, rpos_gm,  10, cv::Scalar(255,0,0), 1, 8, 0 );
-cv::imwrite("/home/hankm/results/neuro_exploration_res/out_rpose.png", tmp);
+//cv::Mat tmp;
+//cv::cvtColor( processed_gmap, tmp, cv::COLOR_GRAY2BGR);
+//cv::circle(tmp, rpos_gm,  10, cv::Scalar(255,0,0), 1, 8, 0 );
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/out_rpose.png", tmp);
 
 	cv::Mat gmap_tform, fr_img_tform, astar_net_input ;
 
@@ -1026,6 +1067,10 @@ cv::imwrite("/home/hankm/results/neuro_exploration_res/out_rpose.png", tmp);
 ros::WallTime GPstartTime = ros::WallTime::now();
 	cv::Mat potmap_prediction ;
 	run_tf_astar_session( astar_net_input,  potmap_prediction) ;
+
+ros::WallTime GPendTime = ros::WallTime::now();
+double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
+
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction);
 
 	// select an optimal frontier point
@@ -1128,7 +1173,7 @@ ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", fr_img.rows, fr_img
 			}
 		}
 	}
-ROS_INFO("done updating vizfrontiers \n");
+// ROS_INFO("done updating vizfrontiers \n");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Note that model_output_contours are found in DNN output img in which contains extra padding ( using roi ) to make fixed size: 512 512 img.
@@ -1265,7 +1310,7 @@ ROS_INFO("done GM filter \n");
 //}
 
 // save frontier info ;
-	ROS_INFO(" The num of tot frontier points left :  %d\n", m_curr_frontier_set.size() );
+//ROS_INFO(" The num of tot frontier points left :  %d\n", m_curr_frontier_set.size() );
 	//frontier_summary( voFrontierCands );
 
 	//publishFrontierPointMarkers( ) ;
@@ -1275,7 +1320,7 @@ ROS_INFO("done GM filter \n");
 // 		generate a path trajectory
 // 		call make plan service
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-ROS_INFO(" FR is found let's start the make plan service \n");
+//ROS_INFO(" FR is found let's start the make plan service \n");
 
 ///////////////////////////////////////////////////////////////////////
 // 1. estimate dist to each goal using euclidean distance heuristic (we need sorting here)
@@ -1321,8 +1366,6 @@ ROS_INFO(" FR is found let's start the make plan service \n");
 	}
 
 ROS_INFO(" got valid frontier points \n");
-ros::WallTime GPendTime = ros::WallTime::now();
-double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 
 
 	// publish goalexclusive fpts
@@ -1343,7 +1386,7 @@ double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 		tmpcnt++;
 	}
 
-ROS_INFO(" done here 1 \n");
+//ROS_INFO(" done here 1 \n");
 
 //cv::Point2f cvbestgoal = cvgoalcands[best_idx] ;  // just for now... we need to fix it later
 //	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[best_idx] ; //ps.p[0], ps.p[1], 0.f );
@@ -1358,7 +1401,7 @@ ROS_INFO(" msg_frontierpoint size: %d \n", msg_frontierpoints.poses.size() );
 	{
 		m_last_oscillation_reset = ros::Time::now();
 	}
-ROS_INFO(" done here 2 \n");
+//ROS_INFO(" done here 2 \n");
 
 	bool bisocillating = (m_last_oscillation_reset + ros::Duration(8.0) < ros::Time::now() );
 	if( bisocillating ) // first check for oscillation
@@ -1423,7 +1466,7 @@ ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n
 		m_previous_goal = m_targetgoal ;
 	}
 
-ROS_INFO(" done here 2 \n");
+//ROS_INFO(" done here 2 \n");
 
 //////////////////////////////////////////////////////////////////////////////
 // 						Publish frontier pts to Rviz						//
@@ -1432,10 +1475,9 @@ ROS_INFO(" done here 2 \n");
 		const std::unique_lock<mutex> lock(mutex_robot_state) ;
 		me_robotstate = ROBOT_STATE::ROBOT_IS_READY_TO_MOVE;
 	}
-ROS_INFO(" done here 3 \n");
-
+//ROS_INFO(" done here 3 \n");
 	updatePrevFrontierPointsList( ) ;
-ROS_INFO(" done here 4 \n");
+//ROS_INFO(" done here 4 \n");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Lastly we publish the goal and other frontier points ( hands over the control to move_base )
@@ -1458,10 +1500,11 @@ ROS_INFO("********** \t End of mapdata callback routine \t ********** \n");
 	//saveDNNData( img_frontiers_offset, start, best_goal, best_plan, ROI_OFFSET, roi ) ;
 
 // for timing
-mn_mapcallcnt++;
-mf_totalcallbacktime_msec = mf_totalcallbacktime_msec + mapcallback_time + planning_time ;
+mf_totalcallbacktime_msec = mf_totalcallbacktime_msec + mapcallback_time ;
 mf_totalplanningtime_msec = mf_totalplanningtime_msec + planning_time ;
+mf_totalffptime_msec	  = mf_totalffptime_msec	  + ffp_time ;
 
+mn_mapcallcnt++;
 }
 
 void FrontierDetectorDMS::run_tf_fr_detector_session( const cv::Mat& input_map, cv::Mat& model_output)
@@ -1489,7 +1532,13 @@ void FrontierDetectorDMS::run_tf_fr_detector_session( const cv::Mat& input_map, 
 
     mpptf_fd_input_values[0] = int_tensor;
     // //Run the Session
+
+ros::WallTime SessionStartTime = ros::WallTime::now();
     TF_SessionRun(mptf_fd_Session, NULL, mptf_fd_input, mpptf_fd_input_values, 1, mptf_fd_output, mpptf_fd_output_values, 1, NULL, 0, NULL, mptf_fd_Status);
+ros::WallTime SessionEndTime = ros::WallTime::now();
+double session_time = (SessionEndTime - SessionStartTime).toNSec() * 1e-6;
+mf_total_fd_sessiontime_msec = mf_total_fd_sessiontime_msec + session_time ;
+
     if(TF_GetCode(mptf_fd_Status) == TF_OK)
     {
     	ROS_INFO("Session is OK\n");
@@ -1548,7 +1597,12 @@ void FrontierDetectorDMS::run_tf_astar_session( const cv::Mat& input_map, cv::Ma
 
     mpptf_astar_input_values[0] = int_tensor;
     // //Run the Session
+ros::WallTime SessionStartTime = ros::WallTime::now();
     TF_SessionRun(mptf_astar_Session, NULL, mptf_astar_input, mpptf_astar_input_values, 1, mptf_astar_output, mpptf_astar_output_values, 1, NULL, 0, NULL, mptf_astar_Status);
+ros::WallTime SessionEndTime = ros::WallTime::now();
+double session_time = (SessionEndTime - SessionStartTime).toNSec() * 1e-6;
+mf_total_astar_sessiontime_msec += session_time ;
+
     if(TF_GetCode(mptf_astar_Status) == TF_OK)
     {
     	ROS_INFO("Session is OK\n");
@@ -1749,9 +1803,15 @@ void FrontierDetectorDMS::moveRobotCallback(const geometry_msgs::PoseWithCovaria
 // inspect the path
 //////////////////////////////////////////////////////////////////////////////////////////////
 //ROS_INFO("+++++++++++++++++++++++++ @moveRobotCallback, sending a goal +++++++++++++++++++++++++++++++++++++\n");
+ros::WallTime moveRobotStartTime = ros::WallTime::now();
 	m_move_client.sendGoal(goal, boost::bind(&FrontierDetectorDMS::doneCB, this, _1), SimpleMoveBaseClient::SimpleActiveCallback() ) ;
 //ROS_INFO("+++++++++++++++++++++++++ @moveRobotCallback, a goal is sent +++++++++++++++++++++++++++++++++++++\n");
 	m_move_client.waitForResult();
+
+ros::WallTime moveRobotEndTime = ros::WallTime::now();
+double moverobot_time = (moveRobotEndTime - moveRobotStartTime).toNSec() * 1e-6;
+mf_totalmotiontime_msec = mf_totalmotiontime_msec + moverobot_time ;
+mn_moverobotcnt++;
 }
 
 void FrontierDetectorDMS::unreachablefrontierCallback(const geometry_msgs::PoseStamped::ConstPtr& msg )

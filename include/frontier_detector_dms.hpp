@@ -393,12 +393,20 @@ private:
 	std::mutex mutex_currgoal ;
 
 	omp_lock_t m_mplock;
+	ImageDataHandler m_data_handler;
 
 	// for debug
-	int mn_mapcallcnt, mn_mapdatacnt ;
-	double mf_avgcallbacktime_msec, mf_avgplanngtime_msec, mf_totalcallbacktime_msec, mf_totalplanningtime_msec ;
+	ofstream m_ofs_ae_report ;
+	string mstr_report_filename ;
+	int mn_mapcallcnt, mn_mapdatacnt, mn_moverobotcnt ;
+	double mf_avgcallbacktime_msec, mf_totalcallbacktime_msec ;
+	double mf_avgplanngtime_msec, mf_totalplanningtime_msec  ;
+	double mf_avgffptime_msec, mf_totalffptime_msec ;
+	double mf_avgmotiontime_msec, mf_totalmotiontime_msec ;
+	double mf_avg_fd_sessiontime_msec, mf_total_fd_sessiontime_msec;
+	double mf_avg_astar_sessiontime_msec, mf_total_astar_sessiontime_msec;
 
-	ImageDataHandler m_data_handler;
+	ros::WallTime m_ae_start_time ;
 };
 
 }
