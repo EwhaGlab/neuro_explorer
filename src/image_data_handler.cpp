@@ -31,7 +31,6 @@ void ImageDataHandler::transform_map_to_robotposition( const cv::Mat& input_map,
 	int nheight = input_map.rows ;
 	int nwidth  = input_map.cols ;
 	int nchannels	= input_map.channels() ;
-
 	CV_Assert(nchannels <= 3); // I can handle only single or 3 ch images
 
 	int nhalfsize = nheight / 2 ;
@@ -49,8 +48,24 @@ void ImageDataHandler::transform_map_to_robotposition( const cv::Mat& input_map,
 
 void ImageDataHandler::inv_transform_map_to_robotposition( const cv::Mat& input_map, const int& rx_gm, const int& ry_gm, const uint8_t& base_val, cv::Mat& out_map )
 {
+	int nheight = input_map.rows ;
+	int nwidth  = input_map.cols ;
+	int nchannels	= input_map.channels() ;
+	CV_Assert(nchannels <= 3); // I can handle only single or 3 ch images
 
+	int nhalfsize = nheight / 2 ;
+	cv::Mat map_expanded = cv::Mat( nheight * 3, nwidth * 3, CV_8UC(nchannels), cv::Scalar::all(base_val) );
+	cv::Rect roi(nwidth, nheight, nwidth, nheight );
+
+	cv::Mat map_expanded_roi = map_expanded(roi) ;
+	input_map.copyTo(map_expanded_roi) ;
+	int ys = nheight + nhalfsize - ry_gm  ;
+	int xs = nwidth  + nhalfsize - rx_gm ;
+
+	cv::Rect crop_roi(xs, ys, nwidth, nheight );
+	out_map = map_expanded(crop_roi).clone() ;
 }
+
 
 void ImageDataHandler::inv_transform_point_to_robotposition( const vector<PointClass>& pts, const int& nheight,
 		const int& nwidth, const int& rx_gm, const int& ry_gm, vector<PointClass>& pts_tformed )
@@ -66,6 +81,7 @@ void ImageDataHandler::inv_transform_point_to_robotposition( const vector<PointC
 		pts_tformed.push_back(pt_t);
 	}
 }
+
 
 void ImageDataHandler::generate_gaussian_image( const int& nheight, const int& nwidth, const int& kernel_size, const float& sigma )
 {

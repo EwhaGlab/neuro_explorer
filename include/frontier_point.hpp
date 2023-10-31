@@ -102,8 +102,6 @@ public:
 		float b = (1-alpha) * c0.b  +  alpha * c1.b ;
 	    return rgb(r,g,b);
 	}
-	std::vector<PointClass> point_classes ;
-	std::vector<rgb> point_colors ;
 
 	void push_point( PointClass pc)
 	{
@@ -115,7 +113,11 @@ public:
 
 	std::vector<PointClass> GetPointClass() const {return point_classes; }
 	std::vector<rgb> GetPointColor() const {return point_colors; }
+	int size() const {return point_colors.size(); }
 
+private:
+	std::vector<PointClass> point_classes ;
+	std::vector<rgb> point_colors ;
 	int maxlabel ;
 	rgb minColor, maxColor ;
 

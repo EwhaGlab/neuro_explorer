@@ -89,6 +89,10 @@ public:
 	FrontierDetectorDMS(const ros::NodeHandle private_nh_, const ros::NodeHandle &nh_);
 	virtual ~FrontierDetectorDMS();
 
+	void initalize_fd_model( ) ;
+	void initalize_astar_model( ) ;
+	void initalize_covrew_model( ) ;
+
 	void initmotion( const float& fvx, const float& fvy, const float& ftheta );
 	inline void SetInitMotionCompleted(){ mb_isinitmotion_completed = true;  }
 	inline void SetNumThreads(int numthreads){ mn_numthreads = numthreads; }
@@ -105,9 +109,6 @@ public:
 	void moveRobotCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg ) ;
 	void unreachablefrontierCallback(const geometry_msgs::PoseStamped::ConstPtr& msg );
 
-	int displayMapAndFrontiers(const cv::Mat& mapimg, const vector<cv::Point>& frontiers, const int winsize ) ;
-	bool isValidPlan( vector<cv::Point>  );
-	bool explorationisdone() const { return mb_explorationisdone; };
 	void publishDoneExploration() ;
 
 	void publishFrontierPoints() ;
@@ -293,12 +294,14 @@ public:
     static void NoOpDeallocator(void* data, size_t a, void* b){};
     void run_tf_fr_detector_session( const cv::Mat& input_map, cv::Mat& model_output ) ;
     void run_tf_astar_session( const cv::Mat& input_map, cv::Mat& model_output );
+    void run_tf_covrew_session( const cv::Mat& input_map, cv::Mat& model_output );
 
 // optimal FR pt selection
     int locate_optimal_point_from_potmap( const cv::Mat& input_potmap, const uint8_t& optVal, vector<cv::Point>& points   ) ;
+    int assign_classes_to_points( const cv::Mat& input_map, vector<PointClass>& points   ) ;
 
-    int assign_potmap_point_class( const cv::Mat& input_potmap, vector<PointClass>& points   ) ;
-
+//	Ensemble
+    void ensemble_predictions( const cv::Mat& potmap_prediction, const cv::Mat& covrew_prediction, cv::Mat& ensembled_output );
 
 protected:
 
@@ -345,7 +348,7 @@ protected:
 
 // tensorflow api
 // frontier detection
-	TF_Graph* mptf_fd_Graph;
+	//TF_Graph* mptf_fd_Graph;
 	TF_Status* mptf_fd_Status ;
     TF_SessionOptions* mptf_fd_SessionOpts ;
     TF_Buffer* mptf_fd_RunOpts ;
@@ -359,7 +362,6 @@ protected:
     TF_Tensor** mpptf_fd_output_values ;
     TF_Tensor* mptf_fd_int_tensor ;
     float* mpf_fd_data ;
-    float* mpf_fd_result ;
 
 // astar potmap predictor network
 	TF_Graph* mptf_astar_Graph;
@@ -376,7 +378,22 @@ protected:
     TF_Tensor** mpptf_astar_output_values ;
     TF_Tensor* mptf_astar_int_tensor ;
     float* mpf_astar_data ;
-    float* mpf_astar_result ;
+
+// covrew predictor network
+	//TF_Graph* mptf_covrew_Graph;
+	TF_Status* mptf_covrew_Status ;
+	TF_SessionOptions* mptf_covrew_SessionOpts ;
+	TF_Buffer* mptf_covrew_RunOpts ;
+	TF_Session* mptf_covrew_Session;
+	string m_str_covrew_modelfilepath;
+	TF_Output* mptf_covrew_input ;
+	TF_Output mtf_covrew_t0 ;
+	TF_Output* mptf_covrew_output ;
+	TF_Output mtf_covrew_t2 ;
+	TF_Tensor** mpptf_covrew_input_values ;
+	TF_Tensor** mpptf_covrew_output_values ;
+	TF_Tensor* mptf_covrew_int_tensor ;
+	float* mpf_covrew_data ;
 
     int mn_num_classes ;
 
@@ -400,11 +417,19 @@ private:
 	string mstr_report_filename ;
 	int mn_mapcallcnt, mn_mapdatacnt, mn_moverobotcnt ;
 	double mf_avgcallbacktime_msec, mf_totalcallbacktime_msec ;
-	double mf_avgplanngtime_msec, mf_totalplanningtime_msec  ;
-	double mf_avgffptime_msec, mf_totalffptime_msec ;
+
+	//double mf_avgplanngtime_msec, mf_totalplanningtime_msec  ;
+	//double mf_avgffptime_msec, mf_totalffptime_msec ;
+	//double mf_avgcovrewtime_msec, mf_totalcovrewtime_msec ;
+
 	double mf_avgmotiontime_msec, mf_totalmotiontime_msec ;
+
 	double mf_avg_fd_sessiontime_msec, mf_total_fd_sessiontime_msec;
 	double mf_avg_astar_sessiontime_msec, mf_total_astar_sessiontime_msec;
+	double mf_avg_covrew_sessiontime_msec, mf_total_covrew_sessiontime_msec;
+
+	vector<double> mvf_fr_detection_time, mvf_astar_time, mvf_covrew_time;
+
 
 	ros::WallTime m_ae_start_time ;
 };

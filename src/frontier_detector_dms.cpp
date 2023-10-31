@@ -54,8 +54,8 @@ mb_strict_unreachable_decision(true),
 me_prev_exploration_state( SUCCEEDED ), mb_nbv_selected(false), //, mn_prev_nbv_posidx(-1)
 mb_allow_unknown(true),
 mn_mapcallcnt(0), mn_moverobotcnt(0),
-mf_totalcallbacktime_msec(0.f), mf_totalffptime_msec(0.f), 	mf_totalplanningtime_msec(0.f), mf_totalmotiontime_msec(0.f),
-mf_avgcallbacktime_msec(0.f), 	mf_avgffptime_msec(0.f), 	mf_avgplanngtime_msec(0.f), 	mf_avgmotiontime_msec(0.f),
+mf_totalcallbacktime_msec(0.f), mf_totalmotiontime_msec(0.f),
+mf_avgcallbacktime_msec(0.f), 	mf_avgmotiontime_msec(0.f),
 mf_avg_fd_sessiontime_msec(0.f), mf_total_fd_sessiontime_msec(0.f),
 mf_avg_astar_sessiontime_msec(0.f), mf_total_astar_sessiontime_msec(0.f),
 mn_num_classes(8)
@@ -85,6 +85,7 @@ mn_num_classes(8)
 
 	m_nh.getParam("/tf_loader/fd_model_filepath", m_str_fd_modelfilepath);
 	m_nh.getParam("/tf_loader/astar_model_filepath", m_str_astar_modelfilepath);
+	m_nh.getParam("/tf_loader/covrew_model_filepath", m_str_covrew_modelfilepath);
 	m_nh.param("/tf_loader/num_classes", mn_num_classes);
 	//m_nh.getParam("/tf_loader/max_gmap_width", mn_max_gmap_width);
 	//m_nh.getParam("/tf_loader/max_gmap_height", mn_max_gmap_height);
@@ -188,17 +189,52 @@ ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // tf FD model
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    mptf_fd_Graph = TF_NewGraph();
+	initalize_fd_model();
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// tf astar model
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	initalize_astar_model();
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// tf covrew model
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	initalize_covrew_model();
+
+	// data handler
+	m_data_handler = ImageDataHandler( mn_processed_gmap_height, mn_processed_gmap_width, 0.5f );
+	ROS_INFO("model num classes: %d \n", mn_num_classes);
+
+}
+
+FrontierDetectorDMS::~FrontierDetectorDMS()
+{
+	delete [] mp_cost_translation_table;
+//Free tensorflow instances
+	free(mpptf_fd_input_values);
+	free(mpptf_fd_output_values);
+	free(mptf_fd_output);
+	free(mptf_fd_input);
+	delete [] mpf_fd_data ;
+
+	free(mpptf_astar_input_values);
+	free(mpptf_astar_output_values);
+	free(mptf_astar_output);
+	free(mptf_astar_input);
+	delete [] mpf_astar_data ;
+}
+
+void FrontierDetectorDMS::initalize_fd_model( )
+{
+	TF_Graph* ptf_fd_Graph = TF_NewGraph();
     mptf_fd_Status = TF_NewStatus();
     mptf_fd_SessionOpts = TF_NewSessionOptions();
     mptf_fd_RunOpts = NULL;
 
     const char* tags = "serve"; // default model serving tag; can change in future
     int ntags = 1;
-    mptf_fd_Session = TF_LoadSessionFromSavedModel(mptf_fd_SessionOpts, mptf_fd_RunOpts, m_str_fd_modelfilepath.c_str(), &tags, ntags, mptf_fd_Graph, NULL, mptf_fd_Status);
+    mptf_fd_Session = TF_LoadSessionFromSavedModel(mptf_fd_SessionOpts, mptf_fd_RunOpts, m_str_fd_modelfilepath.c_str(), &tags, ntags, ptf_fd_Graph, NULL, mptf_fd_Status);
     if(TF_GetCode(mptf_fd_Status) == TF_OK)
     {
-        printf("TF_LoadSessionFromSavedModel OK at the init state\n");
+        printf("TF_LoadSessionFrom FD SavedModel OK at the init state\n");
     }
     else
     {
@@ -210,7 +246,7 @@ ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
     int NumInputs = 1;
     mptf_fd_input = (TF_Output*)malloc(sizeof(TF_Output) * NumInputs);
 
-    mtf_fd_t0 = {TF_GraphOperationByName(mptf_fd_Graph, "serving_default_input_1"), 0};
+    mtf_fd_t0 = {TF_GraphOperationByName(ptf_fd_Graph, "serving_default_input_1"), 0};
     if(mtf_fd_t0.oper == NULL)
         printf("ERROR: Failed TF_GraphOperationByName serving_default_input_1\n");
     else
@@ -222,7 +258,7 @@ ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
     int NumOutputs = 1;
     mptf_fd_output = (TF_Output*)malloc(sizeof(TF_Output) * NumOutputs);
 
-    mtf_fd_t2 = {TF_GraphOperationByName(mptf_fd_Graph, "StatefulPartitionedCall"), 0};
+    mtf_fd_t2 = {TF_GraphOperationByName(ptf_fd_Graph, "StatefulPartitionedCall"), 0};
     if(mtf_fd_t2.oper == NULL)
         printf("ERROR: Failed TF_GraphOperationByName StatefulPartitionedCall\n");
     else
@@ -236,11 +272,12 @@ ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
 
     //*** data allocation
     mpf_fd_data = new float[ (mn_processed_gmap_height) * (mn_processed_gmap_width) ];
-    mpf_fd_result = new float[ (mn_processed_gmap_height) * (mn_processed_gmap_width) ];
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// tf astar model
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+}
+void FrontierDetectorDMS::initalize_astar_model( )
+{
+    const char* tags = "serve"; // default model serving tag; can change in future
+    int ntags = 1;
+	int NumInputs = 1;
 	mptf_astar_Graph = TF_NewGraph();
 	mptf_astar_Status = TF_NewStatus();
 	mptf_astar_SessionOpts = TF_NewSessionOptions();
@@ -268,6 +305,7 @@ ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
 	mptf_astar_input[0] = mtf_astar_t0;
 
 	//********* Get Output tensor
+    int NumOutputs = 1;
 	mptf_astar_output = (TF_Output*)malloc(sizeof(TF_Output) * NumOutputs);
 	mtf_astar_t2 = {TF_GraphOperationByName(mptf_astar_Graph, "StatefulPartitionedCall"), 0};
 	if(mtf_astar_t2.oper == NULL)
@@ -283,33 +321,59 @@ ROS_INFO("report file: %s\n", str_ae_report_file.c_str());
 
 	//*** data allocation
 	mpf_astar_data = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 3 ];
-	mpf_astar_result = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 3 ];
-
-	// data handler
-	m_data_handler = ImageDataHandler( mn_processed_gmap_height, mn_processed_gmap_width, 0.5f );
-
-	ROS_INFO("model num classes: %d \n", mn_num_classes);
-
 }
-
-FrontierDetectorDMS::~FrontierDetectorDMS()
+void FrontierDetectorDMS::initalize_covrew_model( )
 {
-	delete [] mp_cost_translation_table;
-//Free tensorflow instances
-	free(mpptf_fd_input_values);
-	free(mpptf_fd_output_values);
-	free(mptf_fd_output);
-	free(mptf_fd_input);
-	delete [] mpf_fd_data ;
-	delete [] mpf_fd_result ;
+    const char* tags = "serve"; // default model serving tag; can change in future
+    int ntags = 1;
+	int NumInputs = 1;
+	TF_Graph* ptf_covrew_Graph = TF_NewGraph();
 
-	free(mpptf_astar_input_values);
-	free(mpptf_astar_output_values);
-	free(mptf_astar_output);
-	free(mptf_astar_input);
-	delete [] mpf_astar_data ;
-	delete [] mpf_astar_result ;
+	mptf_covrew_Status = TF_NewStatus();
+	mptf_covrew_SessionOpts = TF_NewSessionOptions();
+	mptf_covrew_RunOpts = NULL;
+
+	mptf_covrew_Session = TF_LoadSessionFromSavedModel(mptf_covrew_SessionOpts, mptf_covrew_RunOpts, m_str_covrew_modelfilepath.c_str(), &tags, ntags, ptf_covrew_Graph, NULL, mptf_covrew_Status);
+	if(TF_GetCode(mptf_covrew_Status) == TF_OK)
+	{
+		printf("TF_LoadSessionFrom CovRew SavedModel OK at the init state\n");
+	}
+	else
+	{
+		printf("%s",TF_Message(mptf_covrew_Status));
+	}
+
+	//****** Get input tensor
+	//TODO : need to use saved_model_cli to read saved_model arch
+	mptf_covrew_input = (TF_Output*)malloc(sizeof(TF_Output) * NumInputs);
+	mtf_covrew_t0 = {TF_GraphOperationByName(ptf_covrew_Graph, "serving_default_input_1"), 0};
+	if(mtf_covrew_t0.oper == NULL)
+		printf("ERROR: Failed TF_GraphOperationByName serving_default_input_1\n");
+	else
+	printf("TF_GraphOperation covrew serving_default_input_1 is OK\n");
+
+	mptf_covrew_input[0] = mtf_covrew_t0;
+
+	//********* Get Output tensor
+    int NumOutputs = 1;
+	mptf_covrew_output = (TF_Output*)malloc(sizeof(TF_Output) * NumOutputs);
+	mtf_covrew_t2 = {TF_GraphOperationByName(ptf_covrew_Graph, "StatefulPartitionedCall"), 0};
+	if(mtf_covrew_t2.oper == NULL)
+		printf("ERROR: Failed TF_GraphOperationByName StatefulPartitionedCall\n");
+	else
+	printf("TF_GraphOperation CovRew StatefulPartitionedCall is OK\n");
+
+	mptf_covrew_output[0] = mtf_covrew_t2;
+
+	//*** allocate data for inputs & outputs
+	mpptf_covrew_input_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumInputs);
+	mpptf_covrew_output_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumOutputs);
+
+	//*** data allocation
+	mpf_covrew_data = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 1 ]; // input_map is 3ch 512 x 512
+//	mpf_covrew_result = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 3 ];
 }
+
 
 void FrontierDetectorDMS::initmotion(  const float& fvx = 0.f, const float& fvy = 0.f, const float& ftheta = 1.f  )
 {
@@ -382,93 +446,60 @@ void FrontierDetectorDMS::generateGridmapFromCostmap( )
 	//ROS_INFO("gmap: ox oy: %f %f \n W H: %d %d", m_gridmap.info.origin.position.x, m_gridmap.info.origin.position.y, m_gridmap.info.width, m_gridmap.info.height);
 }
 
-int FrontierDetectorDMS::displayMapAndFrontiers( const cv::Mat& mapimg, const vector<cv::Point>& frontiers, const int winsize)
-{
-	if(		mapimg.empty() ||
-			mapimg.rows == 0 || mapimg.cols == 0 || m_globalcostmap.info.width == 0 || m_globalcostmap.info.height == 0)
-		return 0;
-
-	float fXstartx=m_globalcostmap.info.origin.position.x; // world coordinate in the costmap
-	float fXstarty=m_globalcostmap.info.origin.position.y; // world coordinate in the costmap
-	float resolution = m_globalcostmap.info.resolution ;
-	int cmwidth= static_cast<int>(m_globalcostmap.info.width) ;
-
-	int x = winsize ;
-	int y = winsize ;
-	int width = mapimg.cols  ;
-	int height= mapimg.rows  ;
-	cv::Mat img = cv::Mat::zeros(height + winsize*2, width + winsize*2, CV_8UC1);
-
-	cv::Mat tmp = img( cv::Rect( x, y, width, height ) ) ;
-
-	mapimg.copyTo(tmp);
-	cv::Mat dst;
-	cvtColor(tmp, dst, cv::COLOR_GRAY2BGR);
-
-	for( size_t idx = 0; idx < frontiers.size(); idx++ )
-	{
-		int x = frontiers[idx].x - winsize ;
-		int y = frontiers[idx].y - winsize ;
-		int width = winsize * 2 ;
-		int height= winsize * 2 ;
-		cv::rectangle( dst, cv::Rect(x,y,width,height), cv::Scalar(0,255,0) );
-	}
-
-	cv::Mat dstroi = dst( cv::Rect( mapimg.cols/4, mapimg.rows/4, mapimg.cols/2, mapimg.rows/2 ) );
-	cv::pyrDown(dstroi, dstroi, cv::Size(dstroi.cols/2, dstroi.rows/2) );
-
-#ifdef FD_DEBUG_MODE
-//	ROS_INFO("displaying dstroi \n");
-//	cv::namedWindow("mapimg", 1);
-//	cv::imshow("mapimg",dst);
-//	cv::waitKey(30);
-#endif
-}
-
-
-bool FrontierDetectorDMS::isValidPlan( vector<cv::Point>  )
-{
-
-}
-
 void FrontierDetectorDMS::publishDoneExploration( )
 {
-	double favg_callback_time = mf_totalcallbacktime_msec / (double)(mn_mapcallcnt) ;
-
-	double favg_ffp_time = mf_totalffptime_msec / (double)(mn_mapcallcnt) ;
-	double favg_fd_session_time = mf_total_fd_sessiontime_msec / (double)(mn_mapcallcnt) ;
-
-	double favg_planning_time = mf_totalplanningtime_msec / (double)(mn_mapcallcnt) ;
-	double favg_astar_session_time = mf_total_astar_sessiontime_msec / (double)(mn_mapcallcnt) ;
-
-	double favg_moverobot_time = mf_totalmotiontime_msec / (double)(mn_moverobotcnt) ;
-
 	ros::WallTime ae_end_time = ros::WallTime::now();
 	double total_exploration_time = (ae_end_time - m_ae_start_time ).toNSec() * 1e-6;
 
+	// time analysis
+	// Note that DNN take a large amount of time for the 1st run...
+
+	double fr_detection_time_fullavg, fr_detection_time_runavg ;
+	double astar_time_fullavg, astar_time_runavg ;
+	double covrew_time_fullavg, covrew_time_runavg ;
+	double fmapcallcnt = (double)(mn_mapcallcnt) ;
+	double fmoverobotcnt = (double)(mn_moverobotcnt);
+
+	fr_detection_time_runavg = std::accumulate(mvf_fr_detection_time.begin()+1, mvf_fr_detection_time.end(), 0.0) / (fmapcallcnt-1) ;
+	fr_detection_time_fullavg = std::accumulate(mvf_fr_detection_time.begin(), mvf_fr_detection_time.end(), 0.0) / (fmapcallcnt) ;
+
+	astar_time_runavg = std::accumulate(mvf_astar_time.begin()+1, mvf_astar_time.end(), 0.0) / (fmapcallcnt-1.0) ;
+	astar_time_fullavg = std::accumulate(mvf_astar_time.begin(), mvf_astar_time.end(), 0.0) /  (fmapcallcnt) ;
+
+	covrew_time_runavg = std::accumulate(mvf_covrew_time.begin()+1, mvf_covrew_time.end(), 0.0) / (fmapcallcnt-1.0) ;
+	covrew_time_fullavg = std::accumulate(mvf_covrew_time.begin(), mvf_covrew_time.end(), 0.0) / (fmapcallcnt) ;
 
 
-	m_ofs_ae_report << "******************* exploration report ************************" << endl;
-	m_ofs_ae_report << "total num of mapcallback         : " << mn_mapcallcnt << endl;
-	m_ofs_ae_report << "total num of move robot cnt      : " << mn_moverobotcnt << endl;
-	m_ofs_ae_report << "tot / avg callback time     (ms) : " << mf_totalcallbacktime_msec << "\t" << favg_callback_time  << endl;
+	m_ofs_ae_report << "******************* exploration report ****************************" << '\n';
+	m_ofs_ae_report<< std::fixed << std::setprecision(2) ;
+	m_ofs_ae_report << "total num of mapcallback         : " << mn_mapcallcnt << '\n';
+	m_ofs_ae_report << "total num of move robot cnt      : " << mn_moverobotcnt << '\n';
+	m_ofs_ae_report << "tot / avg callback time     (ms) : " << mf_totalcallbacktime_msec << "\t" << mf_totalcallbacktime_msec / fmapcallcnt << '\n';
+	m_ofs_ae_report << "tot / avg motion time       (s)  : " << mf_totalmotiontime_msec / 1000.0 << "\t" << mf_totalmotiontime_msec / (fmoverobotcnt * 1000.0) << '\n';
+	m_ofs_ae_report << "total exploration time      (s)  : " << total_exploration_time / 1000.0 << '\n';
+	m_ofs_ae_report << '\n';
 
-	m_ofs_ae_report << "tot / avg fr pred time 	    (ms) : " << mf_totalffptime_msec << "\t" << favg_ffp_time  << endl;
-	m_ofs_ae_report << "tot / avg fr session time   (ms) : " << mf_total_fd_sessiontime_msec << "\t" << favg_fd_session_time  << endl;
+	m_ofs_ae_report << setw(10) << "model  name"  << setw(35) << "full avg time (ms)"           << setw(35) << "except the 1st call (ms)"    << "\n";
+	m_ofs_ae_report << setw(10) << "fr dete net"  << setw(35) << fr_detection_time_fullavg 		<< setw(35) << fr_detection_time_runavg << "\n";
+	m_ofs_ae_report << setw(10) << "astar   net"  << setw(35) << astar_time_fullavg 			<< setw(35) << astar_time_runavg 		<< "\n";
+	m_ofs_ae_report << setw(10) << "cov rew net"  << setw(35) << covrew_time_fullavg 			<< setw(35) << covrew_time_runavg 		<< "\n";
 
-	m_ofs_ae_report << "tot / avg potmap pred time  (ms) : " << mf_totalplanningtime_msec << "\t" << favg_planning_time  << endl;
-	m_ofs_ae_report << "tot / avg A* session time   (ms) : " << mf_total_astar_sessiontime_msec << "\t" << favg_astar_session_time  << endl;
+	m_ofs_ae_report << "\n";
 
-	m_ofs_ae_report << "tot / avg motion time       (s)  : " << mf_totalmotiontime_msec / 1000.0 << "\t" << favg_moverobot_time / 1000.0 << endl;
-	m_ofs_ae_report << endl;
-	m_ofs_ae_report << "total exploration time      (s)  : " << total_exploration_time / 1000.0 << endl;
-	m_ofs_ae_report.close();
+	m_ofs_ae_report << "******************* individual net report ************************" << endl;
+	m_ofs_ae_report << setw(7) << "Call No." << setw(25) << "fr net time (ms)"       << setw(25)  << "astar net time (ms)"      << setw(25) << "cov rew net time (ms)"    << endl;
+for(int idx=0; idx < mvf_fr_detection_time.size(); idx++)
+{
+	m_ofs_ae_report << setw(7) << idx        << setw(25) << mvf_fr_detection_time[idx] <<  setw(25) << mvf_astar_time[idx] << setw(25) << mvf_covrew_time[idx] << endl;
+}
 
-	ROS_INFO("total map data callback counts : %d \n", mn_mapcallcnt  );
-	ROS_INFO("total callback time (sec) %f \n", mf_totalcallbacktime_msec / 1000 );
-	ROS_INFO("total planning time (sec) %f \n", mf_totalplanningtime_msec / 1000 );
-	ROS_INFO("avg callback time (msec) %f \n", favg_callback_time  );
-	ROS_INFO("avg planning time (msec) %f \n", favg_planning_time  );
+m_ofs_ae_report.close();
+
+//	ROS_INFO("total map data callback counts : %d \n", mn_mapcallcnt  );
+//	ROS_INFO("total callback time (sec) %f \n", mf_totalcallbacktime_msec / 1000 );
+//	ROS_INFO("total planning time (sec) %f \n", mf_totalplanningtime_msec / 1000 );
+//	ROS_INFO("avg callback time (msec) %f \n", favg_callback_time  );
+//	ROS_INFO("avg planning time (msec) %f \n", favg_planning_time  );
 
 	ROS_INFO("The exploration task is done... publishing -done- msg" );
 	std_msgs::Bool done_task;
@@ -728,8 +759,6 @@ int FrontierDetectorDMS::savefrontiercands( const nav_msgs::OccupancyGrid& map, 
 }
 
 
-
-
 int FrontierDetectorDMS::frontier_summary( const vector<FrontierPoint>& voFrontierCurrFrame )
 {
 	ROS_INFO("\n========================================================================== \n"
@@ -868,23 +897,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	}
 
 	nav_msgs::OccupancyGrid globalcostmap;
-
 	m_globalcostmap = *msg ;
-
-//ROS_INFO("costmap orig %f %f %f\n",
-//		m_globalcostmap.info.origin.position.x,
-//		m_globalcostmap.info.origin.position.y,
-//		m_globalcostmap.info.origin.position.z
-//		);
-//	if( abs(m_globalcostmap.info.origin.position.x) < 0.001 || abs(m_globalcostmap.info.origin.position.y) < 0.001 )
-//	{
-//		// check if we r exploring a simulator
-//		if( abs(m_init_robot_pose.pose.position.x) > 0 && abs(m_init_robot_pose.pose.position.y) > 0  )
-//		{
-//			ROS_WARN(" origin shouldn't be at <0, 0> in the simulator \n");
-//			return ;
-//		}
-//	}
 
 	globalcostmap = m_globalcostmap;
 
@@ -1011,7 +1024,7 @@ ROS_INFO("roi info: <%d %d %d %d> \n", roi.x, roi.y, roi.width, roi.height) ;
 	geometry_msgs::PoseStamped start = GetCurrRobotPose( );
 
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_pad.png", mcvu_mapimg);
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
+cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
 
 //	dffp::FrontPropagation oFP(img_plus_offset); // image uchar
 //	oFP.update(img_plus_offset, cv::Point(ngmx,ngmy), cv::Point(0,0) );
@@ -1023,6 +1036,9 @@ ROS_INFO("begin DNN FR detection \n");
 
 	cv::Mat fr_img = processed_gmap.clone();
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+// 						run FD prediction session
+//////////////////////////////////////////////////////////////////////////////////////////////
 ros::WallTime GFFPstartTime = ros::WallTime::now();
 	run_tf_fr_detector_session(processed_gmap, fr_img);
 ros::WallTime GFFPendTime = ros::WallTime::now();
@@ -1039,12 +1055,11 @@ double ffp_time = (GFFPendTime - GFFPstartTime ).toNSec() * 1e-6;
 //cv::circle(tmp, rpos_gm,  10, cv::Scalar(255,0,0), 1, 8, 0 );
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/out_rpose.png", tmp);
 
-	cv::Mat gmap_tform, fr_img_tform, astar_net_input ;
-
-	m_data_handler.transform_map_to_robotposition(fr_img, rpos_gm.x, rpos_gm.y, 0, fr_img_tform) ;  // tform fr_img
+	cv::Mat gmap_tform, fr_img_tformed, astar_net_input_tformed ;
+	m_data_handler.transform_map_to_robotposition(fr_img, rpos_gm.x, rpos_gm.y, 0, fr_img_tformed) ;  // tform fr_img
 	m_data_handler.transform_map_to_robotposition(processed_gmap, rpos_gm.x, rpos_gm.y, 127, gmap_tform) ;  // tform fr_img
 	cv::Mat gaussimg_32f = m_data_handler.GetGaussianImg();
-	m_data_handler.generate_astar_net_input(fr_img_tform, gmap_tform, gaussimg_32f, astar_net_input);
+	m_data_handler.generate_astar_net_input(fr_img_tformed, gmap_tform, gaussimg_32f, astar_net_input_tformed);
 //cv::Mat bgr[3] ;
 //split(astar_net_input, bgr) ;
 //cv::Mat I0,I1,I2, G ;
@@ -1059,56 +1074,92 @@ double ffp_time = (GFFPendTime - GFFPstartTime ).toNSec() * 1e-6;
 
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_tfrom.png", gmap_tform);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss_img.png", gaussimg_32f * 255.f);
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input * 255.f);
+cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input_tformed * 255.f);
+
+ROS_INFO("done FR prediction \n");
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						run astar prediction
 //////////////////////////////////////////////////////////////////////////////////////////////
-ros::WallTime GPstartTime = ros::WallTime::now();
-	cv::Mat potmap_prediction ;
-	run_tf_astar_session( astar_net_input,  potmap_prediction) ;
 
+ros::WallTime GPstartTime = ros::WallTime::now();
+	cv::Mat potmap_prediction_tformed ;
+	run_tf_astar_session( astar_net_input_tformed, potmap_prediction_tformed) ;
 ros::WallTime GPendTime = ros::WallTime::now();
 double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction);
 
 	// select an optimal frontier point
-	vector<cv::Point> optpt_cands;
-    locate_optimal_point_from_potmap( potmap_prediction, mn_num_classes-1, optpt_cands ) ;
+//	vector<cv::Point> optpt_cands;
+//    locate_optimal_point_from_potmap( potmap_prediction, mn_num_classes-1, optpt_cands ) ;
 
-    vector<PointClass> potmap_points, potmap_points_tformed ;
-    assign_potmap_point_class( potmap_prediction, potmap_points);
+//    vector<PointClass> potmap_points, potmap_points_tformed ;
+//    assign_potmap_point_class( potmap_prediction, potmap_points);
 	// tform the opt frontier points
-	m_data_handler.inv_transform_point_to_robotposition( potmap_points, processed_gmap.rows, processed_gmap.cols,
-			 	 	 	 	 	 	 	 	 	 	 	 rpos_gm.x, rpos_gm.y, potmap_points_tformed); //optpt_cands_tformed ) ;
+//	m_data_handler.inv_transform_point_to_robotposition( potmap_points, processed_gmap.rows, processed_gmap.cols,
+//			 	 	 	 	 	 	 	 	 	 	 	 rpos_gm.x, rpos_gm.y, potmap_points_tformed); //optpt_cands_tformed ) ;
+
+	cv::Mat potmap_prediction_corrected;
+	m_data_handler.inv_transform_map_to_robotposition(potmap_prediction_tformed, rpos_gm.x, rpos_gm.y, 0, potmap_prediction_corrected);
+
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_corrected.png", potmap_prediction_corrected );
 
 	// The last tform to original coordinate
+//	int xoffset = roi.x / mn_scale ; // roi is defined in max_global_height (1024)
+//	int yoffset = roi.y / mn_scale ;
+//ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
+//	for( int jj=0; jj < potmap_prediction_corrected.size(); jj++)
+//	{
+//		potmap_prediction_corrected[jj].x = potmap_prediction_corrected[jj].x - xoffset ;
+//		potmap_prediction_corrected[jj].y = potmap_prediction_corrected[jj].y - yoffset ;
+//	}
+ROS_INFO("done potmap prediction \n");
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// 						run covrew prediction
+//////////////////////////////////////////////////////////////////////////////////////////////
+ros::WallTime CRstartTime = ros::WallTime::now();
+	cv::Mat covrew_prediction ;
+	run_tf_covrew_session( processed_gmap, covrew_prediction ) ;
+ros::WallTime CRendTime = ros::WallTime::now();
+double covrew_time = (CRendTime - CRstartTime ).toNSec() * 1e-6;
+
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/covrew_net_output.png", covrew_prediction );
+
+ROS_INFO("done cov rew prediction \n");
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// 						Ensemble inv_potmap and covrew
+//////////////////////////////////////////////////////////////////////////////////////////////
+	cv::Mat ensembled_prediction = cv::Mat::zeros( potmap_prediction_corrected.rows, potmap_prediction_corrected.cols, potmap_prediction_corrected.depth() );
+	ensemble_predictions(potmap_prediction_corrected, covrew_prediction, ensembled_prediction);
+
+cv::imwrite("/home/hankm/results/neuro_exploration_res/ensembled_prediction.png", ensembled_prediction );
+
+	double minVal, maxVal;
+	cv::minMaxLoc( ensembled_prediction, &minVal, &maxVal );
+	int nmaxVal = static_cast<int>(maxVal);
+	ROS_INFO("max of ensembled %f \n", maxVal);
+
+	vector<PointClass> labeled_points; //labeled_points_corrected ;
+
+	int num_labeled_points = assign_classes_to_points( ensembled_prediction, labeled_points);
+	PointClassSet labeled_point_class( rgb(0.f, 0.f, 1.f), rgb(1.f, 1.f, 0.f), nmaxVal ) ;
+
 	int xoffset = roi.x / mn_scale ; // roi is defined in max_global_height (1024)
 	int yoffset = roi.y / mn_scale ;
-ROS_INFO("eliminating roi_offset <%d %d> \n", xoffset, yoffset);
-	for( int jj=0; jj < potmap_points_tformed.size(); jj++)
+    vector<cv::Point> optpt_cands ;
+	for(int ii=0; ii < labeled_points.size(); ii++)
 	{
-		potmap_points_tformed[jj].x = potmap_points_tformed[jj].x - xoffset ;
-		potmap_points_tformed[jj].y = potmap_points_tformed[jj].y - yoffset ;
-	}
-
-    vector<cv::Point> optpt_cands_tformed ;
-	for(int ii=0; ii < potmap_points_tformed.size(); ii++)
-	{
-		if(potmap_points_tformed[ii].label == mn_num_classes-1)
+		labeled_point_class.push_point( PointClass( labeled_points[ii].x - xoffset, labeled_points[ii].y - yoffset, labeled_points[ii].label ) ) ;
+		if(labeled_points[ii].label == nmaxVal )
 		{
-			optpt_cands_tformed.push_back( cv::Point( potmap_points_tformed[ii].x, potmap_points_tformed[ii].y) );
+			optpt_cands.push_back( cv::Point( labeled_points[ii].x - xoffset, labeled_points[ii].y - yoffset) );
 		}
 	}
 
-//	PointClassSet potmap_point_class( rgb(0.f, 0.f, 1.f), rgb(1.f, 1.f, 0.f), mn_num_classes ) ;
-//	for( int jj=0; jj < optpt_cands_tformed.size(); jj++)
-//	{
-//		int label =
-//		potmap_point_class.push_point(pc)
-//	}
-
+ROS_INFO(" num labeled points/ opt points: %d %d\n", num_labeled_points, optpt_cands.size() );
 
 //cv::Mat im_tform_gray, im_tform;
 //im_tform_gray = cv::Mat::zeros(potmap_prediction.rows, potmap_prediction.cols, CV_8U);
@@ -1148,9 +1199,9 @@ ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", fr_img.rows, fr_img
 	vizfrontier_regions = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId,	1.f, 0.f, 0.f, 0.1);
 	vizfrontier_regions.type = visualization_msgs::Marker::POINTS;
 
-	visualization_msgs::Marker vizminpot_regions; // min astar distance regions
-	vizfrontier_regions = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId,	0.f, 1.f, 1.f, 0.1);
-	vizfrontier_regions.type = visualization_msgs::Marker::POINTS;
+	visualization_msgs::Marker vizopt_regions; // min astar distance regions
+	vizopt_regions = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId,	0.83, 0.41, 0.12, 0.1);
+	vizopt_regions.type = visualization_msgs::Marker::POINTS;
 
 	// init curr frontier point sets
 	{
@@ -1183,54 +1234,50 @@ ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", fr_img.rows, fr_img
 //	int xoffset = roi.x / mn_scale ; // roi is defined in max_global_height (1024)
 //	int yoffset = roi.y / mn_scale ;
 	vector<vector<cv::Point> > contours_plus_offset = model_output_contours;
-//	for( int ii=0; ii < contours_plus_offset.size(); ii++ )
-//	{
-//		for( int jj=0; jj < contours_plus_offset[ii].size(); jj++)
-//		{
-//			contours_plus_offset[ii][jj].x = model_output_contours[ii][jj].x - xoffset ;
-//			contours_plus_offset[ii][jj].y = model_output_contours[ii][jj].y - yoffset ;
-//
-//			FrontierPoint oFRpoint( cv::Point(contours_plus_offset[ii][jj].x - ROI_OFFSET, contours_plus_offset[ii][jj].y - ROI_OFFSET), cmheight, cmwidth, m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
-//								   gmresolution, mn_numpyrdownsample );
-//
-//			geometry_msgs::Point point_w;
-//			point_w.x = oFRpoint.GetInitWorldPosition().x ;
-//			point_w.y = oFRpoint.GetInitWorldPosition().y ;
-//			vizfrontier_regions.points.push_back( point_w ) ;
-//		}
-//	}
-
-
-	for( int ii=0; ii < potmap_points_tformed.size(); ii++ )
+	for( int ii=0; ii < contours_plus_offset.size(); ii++ )
 	{
-		if (potmap_points_tformed[ii].label < mn_num_classes - 1)
-			continue;
+		for( int jj=0; jj < contours_plus_offset[ii].size(); jj++)
+		{
+			contours_plus_offset[ii][jj].x = model_output_contours[ii][jj].x - xoffset ;
+			contours_plus_offset[ii][jj].y = model_output_contours[ii][jj].y - yoffset ;
+			FrontierPoint oFRpoint( cv::Point(contours_plus_offset[ii][jj].x - ROI_OFFSET, contours_plus_offset[ii][jj].y - ROI_OFFSET), cmheight, cmwidth, m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
+								   gmresolution, mn_numpyrdownsample );
+			geometry_msgs::Point point_w;
+			point_w.x = oFRpoint.GetInitWorldPosition().x ;
+			point_w.y = oFRpoint.GetInitWorldPosition().y ;
+			vizfrontier_regions.points.push_back( point_w ) ;
+		}
+	}
 
-		FrontierPoint oFRpoint( cv::Point(potmap_points_tformed[ii].x - ROI_OFFSET, potmap_points_tformed[ii].y - ROI_OFFSET), cmheight, cmwidth,
+//	vector<PointClass> points = labeled_point_class.GetPointClass();
+//	vector<rgb> points_rgb = labeled_point_class.GetPointColor();
+//ROS_INFO("FR points size: %d \n", points.size() );
+	for( int ii=0; ii < optpt_cands.size(); ii++ )
+	{
+		//PointClass point = points[ii];
+		//rgb point_rgb = points_rgb[ii];
+		FrontierPoint oFRpoint( cv::Point(optpt_cands[ii].x - ROI_OFFSET, optpt_cands[ii].y - ROI_OFFSET), cmheight, cmwidth,
 								m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x, gmresolution, mn_numpyrdownsample );
 		geometry_msgs::Point point_w;
 		point_w.x = oFRpoint.GetInitWorldPosition().x ;
 		point_w.y = oFRpoint.GetInitWorldPosition().y ;
-		vizfrontier_regions.points.push_back( point_w ) ;
+		vizopt_regions.points.push_back( point_w ) ;
 	}
-
 
 	if( contours_plus_offset.size() == 0 )
 	{
 		ROS_WARN("There is no more frontier region left in this map \n");
-
 		// we update/refresh the frontier points viz markers and publish them...
 		// we don't need to proceed to planning
 	}
 	else // We found fr, update append new points to m_curr_frontier_set accordingly
 	{
 		vector<FrontierPoint> voFrontierCands;
-
-		for( int i = 0; i < optpt_cands_tformed.size(); i++ )
+		for( int i = 0; i < optpt_cands.size(); i++ )
 		{
 			cv::Point frontier ; // frontier points found in the down-sampled map image.
-			frontier.x = optpt_cands_tformed[i].x - ROI_OFFSET ;  // optpt is defined in DS image, so we need to upsample the point back
-			frontier.y = optpt_cands_tformed[i].y - ROI_OFFSET ;
+			frontier.x = optpt_cands[i].x - ROI_OFFSET ;  // optpt is defined in DS image, so we need to upsample the point back
+			frontier.y = optpt_cands[i].y - ROI_OFFSET ;
 			FrontierPoint oPoint( frontier, cmheight, cmwidth,
 									m_gridmap.info.origin.position.y, m_gridmap.info.origin.position.x,
 						   gmresolution, mn_numpyrdownsample );
@@ -1253,11 +1300,11 @@ ROS_INFO("img_frontiers_offset (DNN output) size: %d %d \n", fr_img.rows, fr_img
 
 		if( globalcostmap.info.width > 0 )
 		{
-ROS_ERROR("getting error here in conf measure fn b/c costmap size is downsampled \n");
+//ROS_ERROR("getting error here in conf measure fn b/c costmap size is downsampled \n");
 			mo_frontierfilter.measureCostmapConfidence(globalcostmap, voFrontierCands);
-ROS_INFO("done CM filter \n");
+//ROS_INFO("done CM filter \n");
 			mo_frontierfilter.measureGridmapConfidence(m_gridmap, voFrontierCands);
-ROS_INFO("done GM filter \n");
+//ROS_INFO("done GM filter \n");
 
 			for(size_t idx=0; idx < voFrontierCands.size(); idx++)
 			{
@@ -1314,7 +1361,8 @@ ROS_INFO("done GM filter \n");
 	//frontier_summary( voFrontierCands );
 
 	//publishFrontierPointMarkers( ) ;
-	publishFrontierRegionMarkers ( vizfrontier_regions );
+	//publishFrontierRegionMarkers ( vizfrontier_regions );
+	publishFrontierRegionMarkers ( vizopt_regions );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 		generate a path trajectory
@@ -1343,9 +1391,11 @@ ROS_INFO("done GM filter \n");
 
 		float fdist_sq = (start.pose.position.x - tmp_goal.pose.position.x ) * ( start.pose.position.y - tmp_goal.pose.position.y ) ;
 		float fdist = sqrt(fdist_sq);
-		if (fdist > 1.f)
+		if (true) //fdist > 1.f)
 			msg_frontierpoints.poses.push_back(tmp_goal);
 	}
+
+ROS_INFO(" msg_frontierpoint size: %d \n", msg_frontierpoints.poses.size() );
 
 	if( m_curr_frontier_set.empty() || msg_frontierpoints.poses.size() == 0 ) // terminating condition
 	{
@@ -1392,7 +1442,7 @@ ROS_INFO(" got valid frontier points \n");
 //	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[best_idx] ; //ps.p[0], ps.p[1], 0.f );
 
 // if the best frontier point is the same as the previous frontier point, we need to set a different goal
-ROS_INFO(" msg_frontierpoint size: %d \n", msg_frontierpoints.poses.size() );
+
 	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[0] ; //ps.p[0], ps.p[1], 0.f );
 
 	// check for ocsillation
@@ -1500,17 +1550,19 @@ ROS_INFO("********** \t End of mapdata callback routine \t ********** \n");
 	//saveDNNData( img_frontiers_offset, start, best_goal, best_plan, ROI_OFFSET, roi ) ;
 
 // for timing
-mf_totalcallbacktime_msec = mf_totalcallbacktime_msec + mapcallback_time ;
-mf_totalplanningtime_msec = mf_totalplanningtime_msec + planning_time ;
-mf_totalffptime_msec	  = mf_totalffptime_msec	  + ffp_time ;
-
+mf_totalcallbacktime_msec += mapcallback_time ;
+mvf_fr_detection_time.push_back(ffp_time);
+mvf_astar_time.push_back( planning_time ) ;
+mvf_covrew_time.push_back(covrew_time) ;
 mn_mapcallcnt++;
+
 }
 
 void FrontierDetectorDMS::run_tf_fr_detector_session( const cv::Mat& input_map, cv::Mat& model_output)
 {
+	int nheight = input_map.rows ;
+	int nwidth  = input_map.cols ;
 	memset( mpf_fd_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
-	memset( mpf_fd_result, 0.f, input_map.cols * input_map.rows*sizeof(float) );
 
     for(int ridx=0; ridx < input_map.rows; ridx++)
     {
@@ -1525,10 +1577,10 @@ void FrontierDetectorDMS::run_tf_fr_detector_session( const cv::Mat& input_map, 
     TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_fd_data, ndata, &NoOpDeallocator, 0);
     if (int_tensor != NULL)
     {
-    	ROS_INFO("TF_NewTensor is OK\n");
+    	ROS_INFO("TF_NewTensor FR detection is OK\n");
     }
     else
-    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
+    	ROS_INFO("ERROR: Failed creating FR detection TF_NewTensor\n");
 
     mpptf_fd_input_values[0] = int_tensor;
     // //Run the Session
@@ -1541,14 +1593,14 @@ mf_total_fd_sessiontime_msec = mf_total_fd_sessiontime_msec + session_time ;
 
     if(TF_GetCode(mptf_fd_Status) == TF_OK)
     {
-    	ROS_INFO("Session is OK\n");
+    	ROS_INFO("FR detection Session is OK\n");
     }
     else
     {
     	ROS_INFO("%s",TF_Message(mptf_fd_Status));
     }
 
-    cv::Mat res_32F(512, 512, CV_32FC1, TF_TensorData(*mpptf_fd_output_values));
+    cv::Mat res_32F(nheight, nwidth, CV_32FC1, TF_TensorData(*mpptf_fd_output_values));
 	double minVal, maxVal;
 	cv::minMaxLoc( res_32F, &minVal, &maxVal );
 //	printf("max min: %f %f\n", maxVal, minVal);
@@ -1563,7 +1615,6 @@ void FrontierDetectorDMS::run_tf_astar_session( const cv::Mat& input_map, cv::Ma
 	int nclasses = mn_num_classes ;
 
 	memset( mpf_astar_data, 0.f, nheight * nwidth * nchannels * sizeof(float) );
-//	memset( mpf_astar_result, 0.f, nheight * nwidth * nchannels * sizeof(float) );
 
 	// C H W style { i.e.) depth first then shift to right }
 	for(int ridx=0; ridx < nheight; ridx++)
@@ -1590,10 +1641,10 @@ void FrontierDetectorDMS::run_tf_astar_session( const cv::Mat& input_map, cv::Ma
     TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_astar_data, ndata, &NoOpDeallocator, 0);
     if (int_tensor != NULL)
     {
-    	ROS_INFO("TF_NewTensor is OK\n");
+    	ROS_INFO("A* TF_NewTensor is OK\n");
     }
     else
-    	ROS_INFO("ERROR: Failed TF_NewTensor\n");
+    	ROS_INFO("ERROR: Failed creating A* TF_NewTensor\n");
 
     mpptf_astar_input_values[0] = int_tensor;
     // //Run the Session
@@ -1605,7 +1656,7 @@ mf_total_astar_sessiontime_msec += session_time ;
 
     if(TF_GetCode(mptf_astar_Status) == TF_OK)
     {
-    	ROS_INFO("Session is OK\n");
+    	ROS_INFO("A* session is OK\n");
     }
     else
     {
@@ -1641,6 +1692,78 @@ mf_total_astar_sessiontime_msec += session_time ;
 	}
 }
 
+void FrontierDetectorDMS::run_tf_covrew_session( const cv::Mat& input_map, cv::Mat& model_output )
+{
+	int nheight = input_map.rows ;
+	int nwidth  = input_map.cols ;
+	int nclasses = mn_num_classes ;
+
+	ROS_ASSERT(input_map.depth() == CV_8U);
+	memset( mpf_covrew_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+
+    for(int ridx=0; ridx < input_map.rows; ridx++)
+    {
+    	for(int cidx=0; cidx < input_map.cols; cidx++)
+    	{
+    		int lidx = ridx * input_map.cols + cidx ;
+    		mpf_covrew_data[lidx] = static_cast<float>(input_map.data[lidx]) / 255.f   ;
+    	}
+    }
+    const int ndata = sizeof(float)*1*input_map.rows*input_map.cols*1 ;
+    const int64_t dims[] = {1, input_map.rows, input_map.cols, 1};
+    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_covrew_data, ndata, &NoOpDeallocator, 0);
+    if (int_tensor != NULL)
+    {
+    	ROS_INFO("TF_NewTensor CovRew is OK\n");
+    }
+    else
+    	ROS_INFO("ERROR: Failed creating CovRew TF_NewTensor\n");
+    mpptf_covrew_input_values[0] = int_tensor;
+    // //Run the Session
+
+ros::WallTime SessionStartTime = ros::WallTime::now();
+    TF_SessionRun(mptf_covrew_Session, NULL, mptf_covrew_input, mpptf_covrew_input_values, 1, mptf_covrew_output, mpptf_covrew_output_values, 1, NULL, 0, NULL, mptf_covrew_Status);
+ros::WallTime SessionEndTime = ros::WallTime::now();
+double session_time = (SessionEndTime - SessionStartTime).toNSec() * 1e-6;
+mf_total_covrew_sessiontime_msec = mf_total_covrew_sessiontime_msec + session_time ;
+
+    if(TF_GetCode(mptf_covrew_Status) == TF_OK)
+    {
+    	ROS_INFO("CovRew session is OK\n");
+    }
+    else
+    {
+    	ROS_INFO("%s",TF_Message(mptf_covrew_Status));
+    }
+
+	void* buff = TF_TensorData(mpptf_covrew_output_values[0]);
+	float* offsets = (float*)buff;
+
+	model_output = cv::Mat::zeros(nheight, nwidth, CV_8U);
+
+	// C H W style
+	for (int ridx = 0; ridx < nheight; ++ridx)
+	{
+		for (int cidx = 0; cidx < nwidth; ++cidx)
+		{
+			int max_idx = -1;
+			float max_val = -FLT_MAX;
+
+			for(int chidx=0; chidx < nclasses; chidx++)	// hard coded for now...
+			{
+				int idx = ridx * nheight * nclasses + cidx * nclasses + chidx ;
+				float val = offsets[idx] ;
+				if (val > max_val)
+				{
+					max_val = val;
+					max_idx = chidx;
+				}
+			}
+			model_output.data[ridx*nheight + cidx] = max_idx ;
+		}
+	}
+}
+
 int FrontierDetectorDMS::locate_optimal_point_from_potmap( const cv::Mat& input_potmap, const uint8_t& optVal, vector<cv::Point>& points   )
 {
 	//cv::Mat optFR = input_potmap == optVal ;
@@ -1662,26 +1785,32 @@ int FrontierDetectorDMS::locate_optimal_point_from_potmap( const cv::Mat& input_
 	return ncnt ;
 }
 
-int FrontierDetectorDMS::assign_potmap_point_class( const cv::Mat& input_potmap, vector<PointClass>& points   )
+int FrontierDetectorDMS::assign_classes_to_points( const cv::Mat& input_tmap, vector<PointClass>& points   )
 {
 	//cv::Mat optFR = input_potmap == optVal ;
-	int nheight = input_potmap.rows ;
-	int nwidth = input_potmap.cols ;
+	int nheight = input_tmap.rows ;
+	int nwidth = input_tmap.cols ;
 	int ncnt = 0;
 	for( int ii = 0; ii < nheight; ii++ )
 	{
 		for(int jj =0; jj < nwidth; jj++)
 		{
 			int idx = nwidth * ii + jj ;
-			uint8_t label = input_potmap.data[ idx ];
-			points.push_back( PointClass(jj, ii, (int)label) );
-			ncnt++;
+			uint8_t label = input_tmap.data[ idx ];
+			if( label > 0 )
+			{
+				points.push_back( PointClass(jj, ii, (int)label) );
+				ncnt++;
+			}
 		}
 	}
 	return ncnt ;
 }
 
-
+void FrontierDetectorDMS::ensemble_predictions( const cv::Mat& potmap_prediction, const cv::Mat& covrew_prediction, cv::Mat& ensembled_output )
+{
+	cv::addWeighted( potmap_prediction, 1.0, covrew_prediction, 1.0, 0.0, ensembled_output, -1 );
+}
 
 void FrontierDetectorDMS::saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal,
 								const std::vector<geometry_msgs::PoseStamped>& best_plan, const int& OFFSET, const cv::Rect& roi )
