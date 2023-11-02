@@ -109,11 +109,15 @@ public:
 	void moveRobotCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg ) ;
 	void unreachablefrontierCallback(const geometry_msgs::PoseStamped::ConstPtr& msg );
 
+	void setVizMarkerFromPointClass( const PointClassSet& pointset, visualization_msgs::Marker& vizmarker, const rgb& init_color, float fsize );
 	void publishDoneExploration() ;
-
-	void publishFrontierPoints() ;
 	void publishFrontierPointMarkers( ) ;
 	void publishFrontierRegionMarkers( const visualization_msgs::Marker& vizfrontier_regions  );
+	void publishOptCovRegionMarkers( const visualization_msgs::Marker& vizoptcov_regions  );
+	void publishOptAstarRegionMarkers( const visualization_msgs::Marker& vizoptastar_regions  );
+	void publishOptEnsembledRegionMarkers( const visualization_msgs::Marker& vizopt_regions  );
+
+
 	void publishGoalPointMarker(  const geometry_msgs::PoseWithCovarianceStamped& targetgoal );
 	void publishUnreachbleMarker( const geometry_msgs::PoseStamped& unreachablepose );
 	void publishUnreachableMarkers( ); // const geometry_msgs::PoseStamped& unreachablepose );
@@ -133,7 +137,7 @@ public:
 
 	int frontier_summary( const vector<FrontierPoint>& voFrontierCurrFrame );
 
-	void updateUnreachablePointSet( const nav_msgs::OccupancyGrid& globalcostmap  ) ;
+	void updateUnreachablePointSet(  const nav_msgs::OccupancyGrid& globalcostmap  ) ;
 
 	int selectNextBestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  ) ;
 	int selectEscapingPoint( geometry_msgs::PoseStamped& escapepoint) ;
@@ -310,8 +314,9 @@ protected:
 
 	ros::Subscriber 	m_mapSub, m_poseSub, m_velSub, m_mapframedataSub, m_globalCostmapSub, m_globalCostmapUpdateSub, m_frontierCandSub,
 						m_currGoalSub, m_globalplanSub, m_unreachablefrontierSub ;
-	ros::Publisher 		m_targetsPub, m_markercandPub, m_markerfrontierPub, m_markerfrontierregionPub, m_makergoalPub,
-						m_currentgoalPub, m_marker_unreachpointPub, m_unreachpointPub, m_velPub, m_donePub, m_resetgazeboPub, m_startmsgPub,
+	ros::Publisher 		m_targetsPub, m_markercandPub, m_markerfrontierPub, m_markerfrontierregionPub,
+						m_marker_optcov_regionPub, m_marker_optastar_regionPub, m_marker_optensembled_regionPub,
+						m_makergoalPub,	m_currentgoalPub, m_marker_unreachpointPub, m_unreachpointPub, m_velPub, m_donePub, m_resetgazeboPub, m_startmsgPub,
 						m_otherfrontierptsPub ;
 
 	int32_t mn_FrontierID, mn_UnreachableFptID ;
@@ -321,7 +326,7 @@ protected:
 	string mstr_debugpath ;
 	string mstr_inputparams ;
 	bool mb_isinitmotion_completed ;
-	int mn_processed_gmap_height, mn_processed_gmap_width ;  // down sampled img for DNN network
+	int mn_cnn_height, mn_cnn_width ;  // down sampled img for DNN network
 	cv::Mat mcvu_mapimg, mcvu_costmapimg, mcvu_mapimgroi ;
 
 	FrontierFilter mo_frontierfilter;

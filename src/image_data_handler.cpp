@@ -120,7 +120,6 @@ void ImageDataHandler::generate_gaussian_image( const int& nheight, const int& n
 //cv::Mat gkernel2d_tmp = GKernel;
 //GKernel.convertTo(gkernel2d_tmp, CV_8UC1, 255.0);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gkernel2d.png", gkernel2d_tmp );
-
 	int nxoffset = nwidth /2 - (kernel_size - 1) / 2 ;
 	int nyoffset = nheight/2 - (kernel_size - 1) / 2 ;
 	cv::Rect roi( nxoffset, nyoffset, kernel_size, kernel_size );
