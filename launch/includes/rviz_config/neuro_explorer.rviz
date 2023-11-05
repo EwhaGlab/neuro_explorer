@@ -16,6 +16,7 @@ Panels:
         - /Marker3
         - /MarkerArray3
         - /Marker4
+        - /Marker5
       Splitter Ratio: 0.3347953259944916
     Tree Height: 380
   - Class: rviz/Selection
@@ -412,7 +413,7 @@ Visualization Manager:
       Marker Topic: /filtered_shapes
       Name: MarkerArray
       Namespaces:
-        {}
+        markers: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -420,7 +421,7 @@ Visualization Manager:
       Marker Topic: /curr_goal_shape
       Name: Marker
       Namespaces:
-        {}
+        markers: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -452,15 +453,23 @@ Visualization Manager:
       Marker Topic: /unreachable_shapes
       Name: MarkerArray
       Namespaces:
-        {}
+        markers: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /Ensembled_opt_shapes
+      Marker Topic: /ensembled_opt_shapes
       Name: Marker
       Namespaces:
-        {}
+        markers: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /active_bound
+      Name: Marker
+      Namespaces:
+        markers: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -482,7 +491,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 57.281005859375
+      Distance: 71.65894317626953
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1

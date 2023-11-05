@@ -97,6 +97,8 @@ public:
 	inline void SetInitMotionCompleted(){ mb_isinitmotion_completed = true;  }
 	inline void SetNumThreads(int numthreads){ mn_numthreads = numthreads; }
 
+	void initGlobalmapimgs(  const int& cmheight, const int& cmwidth, const nav_msgs::OccupancyGrid& globalcostmap  );
+	void copyFRtoGlobalmapimg(  const cv::Rect& roi_active, const cv::Mat& fr_img );
 	void globalCostmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
 	void globalCostmapUpdateCallback(const map_msgs::OccupancyGridUpdate::ConstPtr& msg );
 	void robotPoseCallBack( const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg ) ;
@@ -110,13 +112,14 @@ public:
 	void unreachablefrontierCallback(const geometry_msgs::PoseStamped::ConstPtr& msg );
 
 	void setVizMarkerFromPointClass( const PointClassSet& pointset, visualization_msgs::Marker& vizmarker, const rgb& init_color, float fsize );
+	void setActiveBound( const float& frx_w, const float& fry_w, const int& ngmwidth, const int& ngmheight, visualization_msgs::Marker& vizmarker );
 	void publishDoneExploration() ;
 	void publishFrontierPointMarkers( ) ;
 	void publishFrontierRegionMarkers( const visualization_msgs::Marker& vizfrontier_regions  );
 	void publishOptCovRegionMarkers( const visualization_msgs::Marker& vizoptcov_regions  );
 	void publishOptAstarRegionMarkers( const visualization_msgs::Marker& vizoptastar_regions  );
 	void publishOptEnsembledRegionMarkers( const visualization_msgs::Marker& vizopt_regions  );
-
+	void publishActiveBoundLines( const visualization_msgs::Marker& vizbound_lines );
 
 	void publishGoalPointMarker(  const geometry_msgs::PoseWithCovarianceStamped& targetgoal );
 	void publishUnreachbleMarker( const geometry_msgs::PoseStamped& unreachablepose );
@@ -315,7 +318,7 @@ protected:
 	ros::Subscriber 	m_mapSub, m_poseSub, m_velSub, m_mapframedataSub, m_globalCostmapSub, m_globalCostmapUpdateSub, m_frontierCandSub,
 						m_currGoalSub, m_globalplanSub, m_unreachablefrontierSub ;
 	ros::Publisher 		m_targetsPub, m_markercandPub, m_markerfrontierPub, m_markerfrontierregionPub,
-						m_marker_optcov_regionPub, m_marker_optastar_regionPub, m_marker_optensembled_regionPub,
+						m_marker_optcov_regionPub, m_marker_optastar_regionPub, m_marker_optensembled_regionPub, m_active_boundPub,
 						m_makergoalPub,	m_currentgoalPub, m_marker_unreachpointPub, m_unreachpointPub, m_velPub, m_donePub, m_resetgazeboPub, m_startmsgPub,
 						m_otherfrontierptsPub ;
 
@@ -326,8 +329,9 @@ protected:
 	string mstr_debugpath ;
 	string mstr_inputparams ;
 	bool mb_isinitmotion_completed ;
-	int mn_cnn_height, mn_cnn_width ;  // down sampled img for DNN network
-	cv::Mat mcvu_mapimg, mcvu_costmapimg, mcvu_mapimgroi ;
+	int mn_cnn_height, mn_cnn_width ;  	// down sampled img for DNN network
+	cv::Mat mcvu_globalmapimg, mcvu_costmapimg, mcvu_mapimgroi ;
+	cv::Mat mcvu_globalfrimg_ds ;		// down sampled global FR img
 
 	FrontierFilter mo_frontierfilter;
 	tf::TransformListener m_listener;

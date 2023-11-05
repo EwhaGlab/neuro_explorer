@@ -282,6 +282,7 @@ protected:
 	int mn_scale;
 	int mn_roi_size ;
 	int mn_globalmap_width, mn_globalmap_height, mn_globalmap_centx, mn_globalmap_centy ; // global
+	int mn_activemap_width, mn_activemap_height ;
 	float mf_resolution ;
 	int mn_correctionwindow_width ;
 
