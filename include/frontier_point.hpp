@@ -48,11 +48,10 @@ EMail:       kimy@ewha.ac.kr
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 //#include "octomap_server/mapframedata.h"
-
+#include <algorithm>
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <cv_bridge/cv_bridge.h>
-
 #include "nav_msgs/OccupancyGrid.h"
 
 namespace autoexplorer

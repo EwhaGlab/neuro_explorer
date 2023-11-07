@@ -176,6 +176,7 @@ int main(int argc, char** argv)
 				return -1;
 			  }
 		  }
+		  ROS_INFO("Finishing up this node \n");
 		  //front_detector_dms.publishDone();
 		  front_detector_dms.publishDoneExploration();
 		  ros::Duration(0.5).sleep() ;

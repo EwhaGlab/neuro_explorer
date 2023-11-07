@@ -63,7 +63,7 @@ EMail:       kimy@ewha.ac.kr
 
 //#define OCCUPANCY_THR (60)
 //#define DEBUG_MODE
-#define ROI_OFFSET (0) //16)
+//#define ROI_OFFSET (0) //16)
 #define DIST_HIGH  (1.0e10)
 #define FRONTIER_MARKER_SIZE (0.4)
 #define TARGET_MARKER_SIZE (0.5)
@@ -72,6 +72,13 @@ EMail:       kimy@ewha.ac.kr
 
 namespace autoexplorer
 {
+
+bool class_cmp(const PointClass& a, const PointClass& b )
+{
+	if (a.label >= b.label) return true; // label based decending order
+	else
+		return false;
+}
 
 enum PrevExpState {
   ABORTED = 0,
@@ -99,6 +106,7 @@ public:
 
 	void initGlobalmapimgs(  const int& cmheight, const int& cmwidth, const nav_msgs::OccupancyGrid& globalcostmap  );
 	void copyFRtoGlobalmapimg(  const cv::Rect& roi_active, const cv::Mat& fr_img );
+	int  locateFptsFromFRimg( const cv::Mat& cvFRimg, const int& nxoffset, const int& nyoffset, vector<FrontierPoint>& voFrontierCands ) ;
 	void globalCostmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
 	void globalCostmapUpdateCallback(const map_msgs::OccupancyGridUpdate::ConstPtr& msg );
 	void robotPoseCallBack( const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg ) ;

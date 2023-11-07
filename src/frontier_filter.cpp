@@ -81,12 +81,11 @@ static int cmapidx = 0;
 //ROS_INFO("origin in costmap: %f %f\n", fXstart, fXstart );
 
 #ifdef FD_DEBUG_MODE
-	m_nglobalcostmapidx++;
-
+	static int my_cnt = 0;
 	char tmp0[200], tmp1[200], tmp2[200];
-	sprintf(tmp0, "%s/front_in_costmap%05d.txt", m_str_debugpath.c_str(), m_nglobalcostmapidx) ;
-	sprintf(tmp1, "%s/costmap%05d.txt", m_str_debugpath.c_str(), m_nglobalcostmapidx) ;
-	sprintf(tmp2, "%s/gridmap%05d.txt", m_str_debugpath.c_str(), m_nglobalcostmapidx) ;
+	sprintf(tmp0, "%s/front_in_costmap%05d.txt", mstr_debugpath.c_str(), my_cnt) ;
+	sprintf(tmp1, "%s/costmap%05d.txt", mstr_debugpath.c_str(), my_cnt) ;
+	sprintf(tmp2, "%s/gridmap%05d.txt", mstr_debugpath.c_str(), my_cnt) ;
 
 	string str_front_in_costmap(tmp0);
 	string str_costmap_file(tmp1);
@@ -108,6 +107,7 @@ static int cmapidx = 0;
 		ofs_costmap << endl;
 	}
 	ofs_costmap.close();
+	my_cnt++;
 #endif
 
 	for( size_t idx =0; idx < voFrontierCandidates.size(); idx++) // frontiers in image coord
@@ -119,8 +119,6 @@ static int cmapidx = 0;
 		int py_c = frontier_in_gridmap.y ;
 		int px_c = frontier_in_gridmap.x ;
 
-		//int py_c=  floor( (frontier_in_world.y - fYstart ) / resolution  ) ; // px in costmap
-		//int px_c=  floor( (frontier_in_world.x - fXstart ) / resolution  ) ;
 		int8_t cost ;
 		int32_t ncost = 0;
 //ROS_INFO("costmap roi size: %d \n", mn_costmap_roi_size);
@@ -129,33 +127,54 @@ static int cmapidx = 0;
 		int ex = MIN(px_c + mn_costmap_roi_size, width) ;
 		int sy = MAX(py_c - mn_costmap_roi_size, 0);
 		int ey = MIN(py_c + mn_costmap_roi_size, height) ;
-//ROS_INFO("cm test window: %d %d %d %d \n", sx, ex, sy, ey);
-//ROS_INFO("cm size: %d %d px_c py_c %d %d roi_size: %d\n", width, height, px_c, py_c, mn_costmap_roi_size);
-
-		//cv::Mat roi = cv::Mat::zeros(ey - sy + 1, ex - sx + 1, CV_8S); <=== causing bugs...
 
 		int cellcnt = 0;
 		int totcost = 0;
-		for( int ridx =sy; ridx < ey; ridx++)
+		float fcost = 0;
+		float fcm_conf = 1.f;
+		if(mf_costmap_conf_thr > 1) // untolerate any neighboring obs point
 		{
-			for( int cidx=sx; cidx < ex; cidx++)
+			for( int ridx =sy; ridx < ey; ridx++)
 			{
-				//int dataidx = px_c + cidx + (py_c + ridx) * width ;
-				int dataidx = ridx * width + cidx ;
-//ROS_INFO("ind rix cidx %d %d %d ", idx, ridx, cidx);
-				cost = Data[dataidx] ; // 0 ~ 254 --> mapped to 0 ~ 100
-				//if(cost >= 0 )// m_nlethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
-				if(cost >  mn_lethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
+				for( int cidx=sx; cidx < ex; cidx++)
 				{
-					totcost += 1;
+					//int dataidx = px_c + cidx + (py_c + ridx) * width ;
+					int dataidx = ridx * width + cidx ;
+	//ROS_INFO("ind rix cidx %d %d %d ", idx, ridx, cidx);
+					cost = Data[dataidx] ; // 0 ~ 254 --> mapped to 0 ~ 100
+					//if(cost >= 0 )// m_nlethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
+					if(cost > (int8_t)mn_lethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
+					{
+						fcm_conf = 0;
+						break ;
+					}
 				}
-				//roi.data[ ridx * width + cidx ] = cost ;
-				cellcnt++;
 			}
 		}
-//ROS_INFO("done counting the cost \n");
-		float fcost = static_cast<float>(totcost) / static_cast<float>( cellcnt )  ;
-		float fcm_conf = 1.f - std::sqrt( fcost ) ;
+		else
+		{
+			for( int ridx =sy; ridx < ey; ridx++)
+			{
+				for( int cidx=sx; cidx < ex; cidx++)
+				{
+					//int dataidx = px_c + cidx + (py_c + ridx) * width ;
+					int dataidx = ridx * width + cidx ;
+	//ROS_INFO("ind rix cidx %d %d %d ", idx, ridx, cidx);
+					cost = Data[dataidx] ; // 0 ~ 254 --> mapped to 0 ~ 100
+					//if(cost >= 0 )// m_nlethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
+					if(cost >  mn_lethal_cost_thr) //LEATHAL_COST_THR ) // unknown (-1)
+					{
+						totcost += 1;
+					}
+					//roi.data[ ridx * width + cidx ] = cost ;
+					cellcnt++;
+				}
+			}
+			fcost = static_cast<float>(totcost) / static_cast<float>( cellcnt )  ;
+			fcm_conf = 1.f - std::sqrt( fcost ) ;
+		}
+
+//ROS_INFO("roi-size %d  px_c py_c %d %d cm conf: %f tot cost / cell cnt: %d %d \n", mn_costmap_roi_size, px_c, py_c, fcm_conf, totcost, cellcnt);
 		voFrontierCandidates[idx].SetCostmapConfidence(fcm_conf);
 
 		ROS_DEBUG_NAMED("autoexplorer","pt cm conf: %d %d %f (%d/%d)\n", px_c, py_c, fcm_conf, totcost, cellcnt);
