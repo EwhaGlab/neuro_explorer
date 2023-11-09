@@ -2,14 +2,14 @@
 autoexplorer:
     debug_data_save_path:   '/home/hankm/results/neuro_exploration_res'
     ne_report_file:         'ne_report.txt'
-    costmap_conf_thr:       0.4 # 2 0.4 (works for willowgarage) # 0.4 (fetch)   # the higher the more strict. > 1 untolerates any neighboring obstacle point   
-    gridmap_conf_thr:       0.3 # 0.2 (willowgarage)          # the higher the more strict
+    costmap_conf_thr:       0.2 # 2 0.4 (works for willowgarage) # 0.4 (fetch)   # the higher the more strict. > 1 untolerates any neighboring obstacle point   
+    gridmap_conf_thr:       0.2 # 0.2 (willowgarage)          # the higher the more strict
     occupancy_thr:          50       # 0 ~ 100
     lethal_cost_thr:        90 #10   # 0 ~ 100  uk= -1      # the lower the more strict 
-    global_width:           2048 
-    global_height:          2048 
-    active_width:           1024
-    active_height:          1024
+    global_width:           3096 #2048 
+    global_height:          3096 #2048 
+    active_width:           512
+    active_height:          512
     num_downsamples:        1 #2  # 1 if global with is 1024, 2 if 2048 
     weak_comp_thr:          4 #8  # 12   # 10 (willowgarage)
     unreachable_decision_bound:   0.3 # < 4 * 0.05 res >

@@ -65,7 +65,7 @@ struct pointset
 	{return xy < rhs.xy;}
 
 	float p[2]; // point in world coordinate frame
-	int label;
+//	int label;
 };
 
 typedef struct pointclass
@@ -186,7 +186,7 @@ public:
 	void SetCorrectedCoordinate( const cv::Point& pt )
 	{
 		mn_correctedposition_gm = pt;
-		mf_correctedposition_w = gridmap2world( mn_correctedposition_gm  );
+		mf_correctedposition_w = gridmap2world( pt );
 	}
 
 	void SetFrontierFlag( const float& fcm_conf, const float& fgm_conf, const bool& bisexplored, const bool& bisfrontier )
@@ -218,10 +218,12 @@ public:
 	bool isConfidentFrontierPoint() const { return mb_isfrontierpoint; }
 	bool isReachable() const { return mb_isreachable; }
 
+	cv::Point GetDSGridmapPosition()		const {return mn_initposition_dsgm; } // returns input dsgm position
 	cv::Point GetInitGridmapPosition()		const {return mn_initposition_gm; };
 	cv::Point2f GetInitWorldPosition()		const {return mf_initposition_w; };
 	cv::Point GetCorrectedGridmapPosition() const {return mn_correctedposition_gm; };
-	cv::Point2f GetCorrectedWorldPosition() 	const {return mf_correctedposition_w; };
+	cv::Point2f GetCorrectedWorldPosition() const {return mf_correctedposition_w; };
+	int GetNumDS()							const {return m_nNumPyrDownSample; };
 
 	void saveFrontierInfo( std::string strfilename )
 	{

@@ -105,8 +105,8 @@ public:
 	inline void SetNumThreads(int numthreads){ mn_numthreads = numthreads; }
 
 	void initGlobalmapimgs(  const int& cmheight, const int& cmwidth, const nav_msgs::OccupancyGrid& globalcostmap  );
-	void copyFRtoGlobalmapimg(  const cv::Rect& roi_active, const cv::Mat& fr_img );
-	int  locateFptsFromFRimg( const cv::Mat& cvFRimg, const int& nxoffset, const int& nyoffset, vector<FrontierPoint>& voFrontierCands ) ;
+	void copyFRtoGlobalmapimg(  const cv::Rect& roi_active_ds, const cv::Mat& fr_img );
+	int  locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& nxoffset, const int& nyoffset, vector<vector<cv::Point>>& contours_gm, vector<FrontierPoint>& fpts_gm_ds ) ;
 	void globalCostmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
 	void globalCostmapUpdateCallback(const map_msgs::OccupancyGridUpdate::ConstPtr& msg );
 	void robotPoseCallBack( const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg ) ;
@@ -123,6 +123,9 @@ public:
 	void setActiveBound( const float& frx_w, const float& fry_w, const int& ngmwidth, const int& ngmheight, visualization_msgs::Marker& vizmarker );
 	void publishDoneExploration() ;
 	void publishFrontierPointMarkers( ) ;
+	void publishFrontierPointMarkers( const vector<FrontierPoint>& vo_globalfpts_gm, const vector<FrontierPoint>& vo_localfpts_gm) ;
+	void publishFrontierPointMarkers( const vector<FrontierPoint>& vo_localfpts_gm) ;
+
 	void publishFrontierRegionMarkers( const visualization_msgs::Marker& vizfrontier_regions  );
 	void publishOptCovRegionMarkers( const visualization_msgs::Marker& vizoptcov_regions  );
 	void publishOptAstarRegionMarkers( const visualization_msgs::Marker& vizoptastar_regions  );
@@ -325,21 +328,20 @@ protected:
 
 	ros::Subscriber 	m_mapSub, m_poseSub, m_velSub, m_mapframedataSub, m_globalCostmapSub, m_globalCostmapUpdateSub, m_frontierCandSub,
 						m_currGoalSub, m_globalplanSub, m_unreachablefrontierSub ;
-	ros::Publisher 		m_targetsPub, m_markercandPub, m_markerfrontierPub, m_markerfrontierregionPub,
+	ros::Publisher 		m_targetsPub, m_markercandPub, m_markerfrontierPub, m_markerglobalfrontierPub, m_markerfrontierregionPub,
 						m_marker_optcov_regionPub, m_marker_optastar_regionPub, m_marker_optensembled_regionPub, m_active_boundPub,
 						m_makergoalPub,	m_currentgoalPub, m_marker_unreachpointPub, m_unreachpointPub, m_velPub, m_donePub, m_resetgazeboPub, m_startmsgPub,
 						m_otherfrontierptsPub ;
 
-	int32_t mn_FrontierID, mn_UnreachableFptID ;
+	int32_t mn_global_FrontierID, mn_FrontierID, mn_UnreachableFptID ;
 
 	int mn_numthreads;
 	int mn_globalcostmapidx ;
-	string mstr_debugpath ;
 	string mstr_inputparams ;
 	bool mb_isinitmotion_completed ;
 	int mn_cnn_height, mn_cnn_width ;  	// down sampled img for DNN network
 	cv::Mat mcvu_globalmapimg, mcvu_costmapimg, mcvu_mapimgroi ;
-	cv::Mat mcvu_globalfrimg_ds ;		// down sampled global FR img
+	cv::Mat mcvu_globalmapimg_ds, mcvu_globalfrimg_ds ;		// down sampled global FR img
 
 	FrontierFilter mo_frontierfilter;
 	tf::TransformListener m_listener;

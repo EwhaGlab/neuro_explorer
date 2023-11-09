@@ -282,12 +282,13 @@ protected:
 	int mn_scale;
 	int mn_roi_size ;
 	int mn_globalmap_width, mn_globalmap_height, mn_globalmap_centx, mn_globalmap_centy ; // global
-	int mn_activemap_width, mn_activemap_height ;
+	//int mn_activemap_width, mn_activemap_height ;
 	float mf_resolution ;
 	int mn_correctionwindow_width ;
 
 	visualization_msgs::Marker  m_targetgoal_marker, m_optimaltarget_marker ;
 	visualization_msgs::MarkerArray m_frontierpoint_markers, m_cands, m_unreachable_markers ;
+	visualization_msgs::MarkerArray m_global_frontierpoint_markers, m_local_frontierpoint_markers ;
 
 	nav_msgs::OccupancyGrid m_gridmap;
 	nav_msgs::OccupancyGrid m_globalcostmap ;
@@ -300,7 +301,7 @@ protected:
 	std::string m_mapFrameId;
 	std::string m_baseFrameId ;
 
-	int mn_cols, mn_rows, mn_roi_origx, mn_roi_origy ;
+	int mn_cols, mn_rows, mn_orig_x_wrt_cent, mn_orig_y_wrt_cent ;
 	//int m_nCannotFindFrontierCount ;
 	bool mb_explorationisdone ;
 
