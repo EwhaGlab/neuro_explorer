@@ -1,5 +1,5 @@
 
-autoexplorer:
+neuroexplorer:
     debug_data_save_path:   '/home/hankm/results/neuro_exploration_res'
     ne_report_file:         'ne_report.txt'
     costmap_conf_thr:       0.2 # 2 0.4 (works for willowgarage) # 0.4 (fetch)   # the higher the more strict. > 1 untolerates any neighboring obstacle point   

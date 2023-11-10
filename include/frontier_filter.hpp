@@ -1,5 +1,5 @@
 /*********************************************************************
-Copyright 2022 The Ewha Womans University.
+Copyright 2024 The Ewha Womans University.
 All Rights Reserved.
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE
 Permission to use, copy, modify OR distribute this software and its
@@ -57,7 +57,7 @@ EMail:       kimy@ewha.ac.kr
 #include "frontier_point.hpp"
 
 using namespace std;
-namespace autoexplorer
+namespace neuroexplorer
 {
 
 class FrontierFilter

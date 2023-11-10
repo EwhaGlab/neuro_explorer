@@ -16,7 +16,7 @@
     <param name="numthreads" value="$(arg numthreads)"/>
     
     <arg name="rviz_config" value ="$(find neuro_explorer)/launch/includes/rviz_config/neuro_explorer.rviz"/>
-    <rosparam command="load" file="$(find neuro_explorer)/param/autoexploration.yaml"/>
+    <rosparam command="load" file="$(find neuro_explorer)/param/neuroexploration.yaml"/>
     
     <!--include file="$(find neuro_explorer)/launch/includes/explore_bench-corridor.launch"/-->
     

@@ -42,7 +42,7 @@ EMail:       kimy@ewha.ac.kr
 
 #include "frontier_filter.hpp"
 
-namespace autoexplorer
+namespace neuroexplorer
 {
 
 FrontierFilter::FrontierFilter(){};

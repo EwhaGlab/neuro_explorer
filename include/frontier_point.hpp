@@ -1,5 +1,5 @@
 /*********************************************************************
-Copyright 2022 The Ewha Womans University.
+Copyright 2024 The Ewha Womans University.
 All Rights Reserved.
 MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE
 Permission to use, copy, modify OR distribute this software and its
@@ -53,8 +53,9 @@ EMail:       kimy@ewha.ac.kr
 #include <ros/console.h>
 #include <cv_bridge/cv_bridge.h>
 #include "nav_msgs/OccupancyGrid.h"
+#include "dffp.hpp"
 
-namespace autoexplorer
+namespace neuroexplorer
 {
 
 struct pointset

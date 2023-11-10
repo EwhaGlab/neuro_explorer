@@ -9,7 +9,7 @@
 
 #include "image_data_handler.hpp"
 
-namespace autoexplorer
+namespace neuroexplorer
 {
 
 ImageDataHandler::ImageDataHandler( int nheight, int nwidth, float fsigma = 0.5f):

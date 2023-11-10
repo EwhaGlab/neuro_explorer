@@ -1,5 +1,5 @@
 /*********************************************************************
-Copyright 2022 The Ewha Womans University.
+Copyright 2024 The Ewha Womans University.
 All Rights Reserved.
 Permission to use, copy, modify OR distribute this software and its
 documentation for educational, research and non-profit purposes, without
@@ -69,17 +69,15 @@ EMail:       kimy@ewha.ac.kr
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <cv_bridge/cv_bridge.h>
+#include "neuro_explorer.hpp"
 
-#include "../include/frontier_detector_sms.hpp_"
-#include "frontier_detector_dms.hpp"
-
-using namespace autoexplorer;
+using namespace neuroexplorer;
 
 enum SLAM_ID{GMAPPING=0, CARTOGRAPHER, SLAM_TOOLBOX, GT_MAPPING};
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "frontier_detector");
+  ros::init(argc, argv, "neuro_explorer");
   const ros::NodeHandle nh;
   const ros::NodeHandle private_nh("~");
 
@@ -132,13 +130,13 @@ int main(int argc, char** argv)
   	  }
   	  case SLAM_TOOLBOX:
   	  {
-		  ROS_INFO("Initializing frontier_detector_dms \n");
-		  FrontierDetectorDMS front_detector_dms(private_nh, nh);
-		  front_detector_dms.SetNumThreads(numthreads);
+		  ROS_INFO("Initializing neuro_explorer \n");
+		  NeuroExplorer neuro_explorer(private_nh, nh);
+		  neuro_explorer.SetNumThreads(numthreads);
 		  ros::spinOnce();
 		  //front_detector_dms.initmotion();
-		  front_detector_dms.SetInitMotionCompleted();
-		  while( !front_detector_dms.isDone() && ros::ok() )
+		  neuro_explorer.SetInitMotionCompleted();
+		  while( !neuro_explorer.isDone() && ros::ok() )
 		  {
 			  try{
 				  ros::spinOnce();
@@ -150,22 +148,22 @@ int main(int argc, char** argv)
 			  }
 		  }
 		  //front_detector_dms.publishDone();
-		  front_detector_dms.publishDoneExploration();
+		  neuro_explorer.publishDoneExploration();
 		  ros::Duration(0.5).sleep() ;
 		  break;
   	  }
 
   	  case GT_MAPPING:
   	  {
-		  ROS_INFO("Initializing frontier_detector_dms \n");
-		  FrontierDetectorDMS front_detector_dms(private_nh, nh);
+		  ROS_INFO("Initializing neuro_explorer \n");
+		  NeuroExplorer neuro_explorer(private_nh, nh);
 
 		  ROS_INFO("Setting num of thread %d \n", numthreads);
-		  front_detector_dms.SetNumThreads(numthreads);
+		  neuro_explorer.SetNumThreads(numthreads);
 		  ros::spinOnce();
-		  front_detector_dms.initmotion( 0.2, 0.2, 1.0 );
-		  front_detector_dms.SetInitMotionCompleted();
-		  while( !front_detector_dms.isDone() && ros::ok() )
+		  neuro_explorer.initmotion( 0.2, 0.2, 1.0 );
+		  neuro_explorer.SetInitMotionCompleted();
+		  while( !neuro_explorer.isDone() && ros::ok() )
 		  {
 			  try{
 				  ros::spinOnce();
@@ -178,7 +176,7 @@ int main(int argc, char** argv)
 		  }
 		  ROS_INFO("Finishing up this node \n");
 		  //front_detector_dms.publishDone();
-		  front_detector_dms.publishDoneExploration();
+		  neuro_explorer.publishDoneExploration();
 		  ros::Duration(0.5).sleep() ;
 		  break;
   	  }

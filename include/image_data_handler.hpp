@@ -20,8 +20,7 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include "frontier_point.hpp"
 
-using namespace std;
-namespace autoexplorer
+namespace neuroexplorer
 {
 
 //typedef struct pointclass
