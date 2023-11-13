@@ -1,0 +1,11 @@
+Header header
+std_msgs/Bool viz_flag
+geometry_msgs/Point32[] global_frontier_region_w
+geometry_msgs/Point32[] local_frontier_region_w
+geometry_msgs/Point32[] local_fpts_w
+geometry_msgs/Point32[] global_fpts_w
+geometry_msgs/Point32[] unreachable_fpts_w
+geometry_msgs/Point32[] active_bound_w
+geometry_msgs/Point32 target_goal_w
+geometry_msgs/Point32 robot_pose_w
+nav_msgs/MapMetaData  mapdata_info

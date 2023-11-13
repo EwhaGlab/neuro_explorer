@@ -60,11 +60,11 @@ EMail:       kimy@ewha.ac.kr
 
 #include "image_data_handler.hpp"
 #include "tensorflow/c/c_api.h"
+#include "geometry_msgs/Point32.h"
+#include "std_msgs/Bool.h"
+#include "neuro_explorer/VizDataStamped.h"
 
 #define DIST_HIGH  (1.0e10)
-#define FRONTIER_MARKER_SIZE (0.4)
-#define TARGET_MARKER_SIZE (0.5)
-#define UNREACHABLE_MARKER_SIZE (0.4)
 
 
 namespace neuroexplorer
@@ -104,6 +104,7 @@ public:
 	void copyFRtoGlobalmapimg(  const cv::Rect& roi_active_ds, const cv::Mat& fr_img );
 	int  locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& nxoffset, const int& nyoffset, vector<vector<cv::Point>>& contours_gm, vector<FrontierPoint>& fpts_gm_ds ) ;
 	void globalCostmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
+	void gridmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
 	void globalCostmapUpdateCallback(const map_msgs::OccupancyGridUpdate::ConstPtr& msg );
 	void robotPoseCallBack( const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg ) ;
 	void robotVelCallBack( const geometry_msgs::Twist::ConstPtr& msg);
@@ -116,21 +117,8 @@ public:
 	void unreachablefrontierCallback(const geometry_msgs::PoseStamped::ConstPtr& msg );
 
 	void setVizMarkerFromPointClass( const PointClassSet& pointset, visualization_msgs::Marker& vizmarker, const rgb& init_color, float fsize );
-	void setActiveBound( const float& frx_w, const float& fry_w, const int& ngmwidth, const int& ngmheight, visualization_msgs::Marker& vizmarker );
 	void publishDoneExploration() ;
-	void publishFrontierPointMarkers( ) ;
-	void publishFrontierPointMarkers( const vector<FrontierPoint>& vo_globalfpts_gm, const vector<FrontierPoint>& vo_localfpts_gm) ;
-	void publishFrontierPointMarkers( const vector<FrontierPoint>& vo_localfpts_gm) ;
-
-	void publishFrontierRegionMarkers( const visualization_msgs::Marker& vizfrontier_regions  );
-	void publishOptCovRegionMarkers( const visualization_msgs::Marker& vizoptcov_regions  );
-	void publishOptAstarRegionMarkers( const visualization_msgs::Marker& vizoptastar_regions  );
-	void publishOptEnsembledRegionMarkers( const visualization_msgs::Marker& vizopt_regions  );
-	void publishActiveBoundLines( const visualization_msgs::Marker& vizbound_lines );
-
-	void publishGoalPointMarker(  const geometry_msgs::PoseWithCovarianceStamped& targetgoal );
-	void publishUnreachbleMarker( const geometry_msgs::PoseStamped& unreachablepose );
-	void publishUnreachableMarkers( ); // const geometry_msgs::PoseStamped& unreachablepose );
+	void publishVizMarkers( bool bviz_flag = true );
 	void appendUnreachablePoint( const geometry_msgs::PoseStamped& unreachablepose ) ;
 
 	void updatePrevFrontierPointsList( );
@@ -324,12 +312,8 @@ protected:
 
 	ros::Subscriber 	m_mapSub, m_poseSub, m_velSub, m_mapframedataSub, m_globalCostmapSub, m_globalCostmapUpdateSub, m_frontierCandSub,
 						m_currGoalSub, m_globalplanSub, m_unreachablefrontierSub ;
-	ros::Publisher 		m_targetsPub, m_markercandPub, m_markerfrontierPub, m_markerglobalfrontierPub, m_markerfrontierregionPub,
-						m_marker_optcov_regionPub, m_marker_optastar_regionPub, m_marker_optensembled_regionPub, m_active_boundPub,
-						m_makergoalPub,	m_currentgoalPub, m_marker_unreachpointPub, m_unreachpointPub, m_velPub, m_donePub, m_resetgazeboPub, m_startmsgPub,
-						m_otherfrontierptsPub ;
-
-	int32_t mn_global_FrontierID, mn_FrontierID, mn_UnreachableFptID ;
+	ros::Publisher 		m_currentgoalPub, m_targetsPub, m_unreachpointPub, m_velPub, m_donePub, m_resetgazeboPub, m_startmsgPub,
+						m_otherfrontierptsPub, m_vizDataPub ;
 
 	int mn_numthreads;
 	int mn_globalcostmapidx ;
@@ -360,6 +344,9 @@ protected:
 	ros::Time m_last_oscillation_reset ;
 	geometry_msgs::PoseStamped m_previous_robot_pose ;
 	geometry_msgs::PoseStamped m_init_robot_pose ;
+
+	vector<FrontierPoint> mvo_globalfpts_gm, 	mvo_localfpts_gm ;
+	vector<vector<cv::Point>> mvvo_globalfr_gm,	mvvo_localfr_gm ;
 
 // tensorflow api
 // frontier detection
@@ -411,6 +398,8 @@ protected:
 	float* mpf_covrew_data ;
 
     int mn_num_classes ;
+    geometry_msgs::PoseStamped m_rpos_world ;
+
 
 private:
 	std::mutex mutex_robot_state;

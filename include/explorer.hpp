@@ -226,35 +226,7 @@ public:
 
 	inline bool isDone() const { return mb_explorationisdone; }
 
-	visualization_msgs::Marker SetVizMarker( int32_t ID, int32_t action, float fx, float fy, float fz=0, string frame_id = "map",	float fR=1.f, float fG=0.f, const float fB=1.f,
-						float fscale=0.5)
-	{
-		visualization_msgs::Marker  viz_marker;
-		viz_marker.header.frame_id= frame_id;
-		viz_marker.header.stamp=ros::Time(0);
-		viz_marker.ns= "markers";
-		viz_marker.id = ID;
-		viz_marker.action = action ;
 
-		viz_marker.type = visualization_msgs::Marker::CUBE ;
-
-		viz_marker.scale.x= fscale;
-		viz_marker.scale.y= fscale;
-		viz_marker.scale.z= fscale;
-
-		viz_marker.color.r = fR;
-		viz_marker.color.g = fG;
-		viz_marker.color.b = fB;
-		viz_marker.color.a=1.0;
-		viz_marker.lifetime = ros::Duration();
-
-		viz_marker.pose.position.x = fx;
-		viz_marker.pose.position.y = fy;
-		viz_marker.pose.position.z = fz;
-		viz_marker.pose.orientation.w =1.0;
-
-		return viz_marker;
-	}
 
 
 	void saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapData );
@@ -273,10 +245,6 @@ protected:
 	//int mn_activemap_width, mn_activemap_height ;
 	float mf_resolution ;
 	int mn_correctionwindow_width ;
-
-	visualization_msgs::Marker  m_targetgoal_marker, m_optimaltarget_marker ;
-	visualization_msgs::MarkerArray m_frontierpoint_markers, m_cands, m_unreachable_markers ;
-	visualization_msgs::MarkerArray m_global_frontierpoint_markers, m_local_frontierpoint_markers ;
 
 	nav_msgs::OccupancyGrid m_gridmap;
 	nav_msgs::OccupancyGrid m_globalcostmap ;

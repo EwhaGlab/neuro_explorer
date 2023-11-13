@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   costmap_2d
   move_base
+  message_generation
   #navfn
 )
 
@@ -57,11 +58,11 @@ find_package(OpenCV REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  VizDataStamped.msg
+#  Message2.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -78,10 +79,10 @@ find_package(OpenCV REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   nav_msgs#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs std_msgs nav_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -181,15 +182,17 @@ set_target_properties( neuro_explorer PROPERTIES
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node example/neuro_explorer_node.cpp)
-#add_executable(scan2ptcloud_node example/scan_to_ptcloud_node.cpp)
+add_executable(viz_helper_node example/viz_helper_node.cpp)
 
 #add_executable(travel_tracker example/travel_tracker.py)
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(viz_helper_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 #target_compile_options(neuro_explorer PRIVATE ${OpenMP_FLAGS})
 #add_dependencies(neuro_explorer ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(${PROJECT_NAME}_node neuro_explorer )
-#target_link_libraries(scan2ptcloud_node neuro_explorer)
+target_link_libraries(viz_helper_node neuro_explorer)
 
 #target_link_libraries(travel_tracker neuro_explorer)
 
@@ -225,6 +228,10 @@ target_link_libraries(${PROJECT_NAME}_node neuro_explorer )
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
 install(TARGETS ${PROJECT_NAME}_node
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(TARGETS viz_helper_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
