@@ -4,10 +4,10 @@
   <master auto="start"/>
     
   <!--arg name="slam_method" default="gmapping"/>   
-  <include file="$(find autoexplorer)/launch/includes/start_$(arg slam_method).launch">
+  <include file="$(find neuroexplorer)/launch/includes/start_$(arg slam_method).launch">
   </include-->
   
-  <!--include file="$(find autoexplorer)/launch/includes/start_gmapping.launch">
+  <!--include file="$(find neuroexplorer)/launch/includes/start_gmapping.launch">
   </include-->
   
   <!--include file="$(find sim_env)/launch/simulation_environment/corridor_env_single_robot.launch">
@@ -15,7 +15,7 @@
 
   <!-- octomap -->
 
-  <node name="scan2ptcloud" pkg="autoexplorer" type="scan2ptcloud_node">
+  <node name="scan2ptcloud" pkg="neuro_explorer" type="scan2ptcloud_node">
   </node>  
   
   <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom 10">
@@ -54,11 +54,11 @@
     <param name="planner_patience" value="1" />
     <param name="controller_patience" value="1" /> 
     <param name="recovery_behavior_enabled" value="false" />
-    <rosparam file="$(find autoexplorer)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
-    <rosparam file="$(find autoexplorer)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
-    <rosparam file="$(find autoexplorer)/param/local_costmap_params.yaml" command="load" />
-    <rosparam file="$(find autoexplorer)/param/global_costmap_params.yaml" command="load" />
-    <rosparam file="$(find autoexplorer)/param/base_local_planner_params.yaml" command="load" />  
+    <rosparam file="$(find neuroexplorer)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find neuroexplorer)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find neuroexplorer)/param/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find neuroexplorer)/param/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find neuroexplorer)/param/base_local_planner_params.yaml" command="load" />  
     <param name="global_costmap/global_frame" value="map"/>
     <param name="global_costmap/robot_base_frame" value="base_footprint"/> 
     <param name="local_costmap/global_frame" value="map"/>

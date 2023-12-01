@@ -937,7 +937,6 @@ void NeuroExplorer::globalCostmapUpdateCallback(const map_msgs::OccupancyGridUpd
 	}
 }
 
-
 void NeuroExplorer::robotPoseCallBack( const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg )
 {
 	m_robotpose = *msg ;
@@ -1261,6 +1260,11 @@ ROS_INFO("roi (ds) info: <%d %d %d %d> \n", roi_active_ds.x, roi_active_ds.y, ro
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/globalmap_ds.png", mcvu_globalmapimg_ds);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
 
+char tmpgmap[200];
+sprintf(tmpgmap,"%s/processed_gmap%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmpgmap, processed_gmap);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
+
 ROS_INFO("begin DNN FR detection processed gmap size: %d %d \n", processed_gmap.rows, processed_gmap.cols);
 //////////////////////////////////////////////////////////////////////////////////////////////
 //			Run DNN FR prediction session
@@ -1273,6 +1277,9 @@ ros::WallTime GFFPendTime = ros::WallTime::now();
 double ffp_time = (GFFPendTime - GFFPstartTime ).toNSec() * 1e-6;
 ROS_INFO("done FR prediction \n");
 
+char tmptmp[200];
+sprintf(tmptmp,"%s/fr_img%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmptmp, fr_img);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/fr_img.png", fr_img);
 
 // get robot pose in the shifted gm image coordinate
@@ -1288,7 +1295,10 @@ ROS_INFO("done copying fr_img to mcvu_globalfrimg_ds \n");
 	cv::Mat astar_net_input ;
 	//m_data_handler.transform_map_to_robotposition(fr_img, rpos_gmds.x, rpos_gmds.y, 0, fr_img_tformed) ;  // tform fr_img
 	//m_data_handler.transform_map_to_robotposition(processed_gmap, rpos_gmds.x, rpos_gmds.y, 127, gmap_tform) ;  // tform fr_img
+
+// TODO: check if gaussimg_32f has only one max vale (255) at the center of the image.
 	cv::Mat gaussimg_32f = m_data_handler.GetGaussianImg();
+// TODO: double-check with python training code to make sure obs-img is better than gridmap when generating astar_net_inputs.
 	m_data_handler.generate_astar_net_input(fr_img, processed_gmap, gaussimg_32f, astar_net_input);
 //cv::Mat bgr[3] ;
 //split(astar_net_input, bgr) ;
@@ -1304,7 +1314,10 @@ ROS_INFO("done copying fr_img to mcvu_globalfrimg_ds \n");
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_tfrom.png", gmap_tform);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss_img.png", gaussimg_32f * 255.f);
 
-cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input * 255.f);
+char tmpastar[200];
+sprintf(tmpastar,"/home/hankm/results/neuro_exploration_res/astar_net_input%04d.png", mn_mapcallcnt);
+cv::imwrite(tmpastar, astar_net_input * 255.f);
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input * 255.f);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						run astar prediction
@@ -1316,7 +1329,7 @@ ros::WallTime GPstartTime = ros::WallTime::now();
 ros::WallTime GPendTime = ros::WallTime::now();
 double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 ROS_INFO("done potmap prediction \n");
-cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction );
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction );
 
 ROS_INFO(" rpos_gm: %d %d  potmap size: %d %d \n", rpos_gm.x, rpos_gm.y, potmap_prediction.rows, potmap_prediction.cols );
 

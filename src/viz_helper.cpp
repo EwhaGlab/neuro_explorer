@@ -17,37 +17,23 @@ m_nh(nh_),
 mb_explorationisdone(false)
 {
 	m_nh.getParam("/neuroexplorer/debug_data_save_path", m_str_debugpath);
-//	m_nh.getParam("/neuroexplorer/ne_report_file", mstr_report_filename);
 
-//	m_nh.param("/neuroexplorer/costmap_conf_thr", fcostmap_conf_thr, 0.1f);
-//	m_nh.param("/neuroexplorer/gridmap_conf_thr", fgridmap_conf_thr, 0.8f);
-//	m_nh.param("/neuroexplorer/occupancy_thr", mn_occupancy_thr, 50);
-//	m_nh.param("/neuroexplorer/lethal_cost_thr", mn_lethal_cost_thr, 80);
 	m_nh.param("/neuroexplorer/global_width",  mn_globalmap_width, 	2048) ;
-	m_nh.param("/neuroexplorer/global_height", mn_globalmap_height, 	2048) ;
-	//m_nh.param("/neuroexplorer/active_width",  mn_activemap_width, 	1024) ;
-	//m_nh.param("/neuroexplorer/active_height", mn_activemap_height, 	1024) ;
+	m_nh.param("/neuroexplorer/global_height", mn_globalmap_height,	2048) ;
 
-//	m_nh.param("/neuroexplorer/unreachable_decision_bound", mf_neighoringpt_decisionbound, 0.2f);
-//	m_nh.param("/neuroexplorer/weak_comp_thr", nweakcomp_threshold, 10);
 	m_nh.param("/neuroexplorer/num_downsamples", mn_numpyrdownsample, 0);
 	m_nh.param("/neuroexplorer/frame_id", m_worldFrameId, std::string("map"));
-//	m_nh.param("/neuroexplorer/strict_unreachable_decision", mb_strict_unreachable_decision, true);
 	m_nh.param("/move_base/global_costmap/resolution", mf_resolution, 0.05f) ;
 //	m_nh.param("move_base/global_costmap/robot_radius", mf_robot_radius, 0.12); // 0.3 for fetch
 
-//	m_nh.getParam("/tf_loader/fd_model_filepath", m_str_fd_modelfilepath);
-//	m_nh.getParam("/tf_loader/astar_model_filepath", m_str_astar_modelfilepath);
-//	m_nh.getParam("/tf_loader/covrew_model_filepath", m_str_covrew_modelfilepath);
-//	m_nh.param("/tf_loader/num_classes", mn_num_classes, 8);
 	m_nh.param("/tf_loader/cnn_width", mn_cnn_width, 512);
 	m_nh.param("/tf_loader/cnn_height", mn_cnn_height, 512);
 
 	m_vizDataSub  	= m_nh.subscribe("viz_data", 1, &VizHelper::vizCallback, this); // kmHan
 	m_expdoneSub	= m_nh.subscribe("exploration_is_done", 1, &VizHelper::doneCallback, this);
 
-	m_frontier_region_markers = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId, 1.f, 0.f, 0.f, 1.f, 0.1 );
-	m_frontier_region_markers.type = visualization_msgs::Marker::POINTS;
+	//m_frontier_region_markers = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId, 1.f, 0.f, 0.f, 1.f, 0.1 );
+	//m_frontier_region_markers.type = visualization_msgs::Marker::POINTS;
 
 	m_global_frontierpoint_markers = visualization_msgs::MarkerArray() ;
 
@@ -139,9 +125,6 @@ void VizHelper::removeUnreachablePointMarkers()
 void VizHelper::setGlobalFrontierRegionMarkers(const vector<geometry_msgs::Point32>& globalfr_w, visualization_msgs::Marker& vizfr_markers )
 {
 	// reinit FR region
-	m_frontier_region_markers = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId, 1.f, 0.f, 0.f, 1.f, 0.1 );
-	m_frontier_region_markers.type = visualization_msgs::Marker::POINTS;
-
 	for( int ii=0; ii < globalfr_w.size(); ii++ )
 	{
 		geometry_msgs::Point point_w;
@@ -151,24 +134,38 @@ void VizHelper::setGlobalFrontierRegionMarkers(const vector<geometry_msgs::Point
 	}
 }
 
-void VizHelper::setGlobalFrontierPointMarkers( const vector<geometry_msgs::Point32>& global_fpts )
+void VizHelper::setGlobalFrontierPointMarkers( const geometry_msgs::Point32& target_goal, const vector<geometry_msgs::Point32>& global_fpts )
 {
 	for( int ii=0; ii < global_fpts.size(); ii++ )
 	{
-		visualization_msgs::Marker vizmarker = SetVizMarker( mn_global_FrontierID, visualization_msgs::Marker::ADD, global_fpts[ii].x, global_fpts[ii].y, 0.f,
+		float fx_g = global_fpts[ii].x ;
+		float fy_g = global_fpts[ii].y ;
+		float fdist_sq = (target_goal.x - fx_g) * (target_goal.x - fx_g) + (target_goal.y - fy_g) * (target_goal.y - fy_g) ;
+		float fdist    = sqrt(fdist_sq);
+		if( fdist < 0.0005 ) // don't create the marker that is potentially the target point
+			continue ;
+
+		visualization_msgs::Marker vizmarker = SetVizMarker( mn_global_FrontierID, visualization_msgs::Marker::ADD, fx_g, fy_g, 0.f,
 				m_worldFrameId, 0.f, 1.f, 0.f, 0.5f, (float)FRONTIER_MARKER_SIZE );
 		m_global_frontierpoint_markers.markers.push_back(vizmarker);
 		mn_global_FrontierID++ ;
 	}
 }
 
-void VizHelper::setLocalFrontierPointMarkers( const vector<geometry_msgs::Point32>& local_fpts )
+void VizHelper::setLocalFrontierPointMarkers( const geometry_msgs::Point32& target_goal, const vector<geometry_msgs::Point32>& local_fpts )
 {
 	visualization_msgs::Marker fpts_markers;
 
 	for( int ii=0; ii < local_fpts.size(); ii++ )
 	{
-		visualization_msgs::Marker vizmarker = SetVizMarker( mn_FrontierID, visualization_msgs::Marker::ADD, local_fpts[ii].x, local_fpts[ii].y, 0.f,
+		float fx_g = local_fpts[ii].x ;
+		float fy_g = local_fpts[ii].y ;
+		float fdist_sq = (target_goal.x - fx_g) * (target_goal.x - fx_g) + (target_goal.y - fy_g) * (target_goal.y - fy_g) ;
+		float fdist    = sqrt(fdist_sq);
+		if( fdist < 0.0005 ) // don't create the marker that is potentially the target point (within 10mm)
+			continue ;
+
+		visualization_msgs::Marker vizmarker = SetVizMarker( mn_FrontierID, visualization_msgs::Marker::ADD, fx_g, fy_g, 0.f,
 				m_worldFrameId, 0.f, 1.f, 0.f, 1.f, (float)FRONTIER_MARKER_SIZE );
 		m_local_frontierpoint_markers.markers.push_back(vizmarker);
 		mn_FrontierID++ ;
@@ -244,9 +241,9 @@ void VizHelper::publishAll()
 	setGlobalFrontierRegionMarkers( globalfr_w, vizfr_markers );
 //		setLocalFrontierRegionMarkers(  localfr_w );
 	removeGlobalFrontierPointMarkers() ;
-	setGlobalFrontierPointMarkers( global_fpts_w ) ;
+	setGlobalFrontierPointMarkers(targetgoal_w, global_fpts_w ) ;
 	removeLocalFrontierPointMarkers() ;
-	setLocalFrontierPointMarkers(  local_fpts_w ) ;
+	setLocalFrontierPointMarkers (targetgoal_w, local_fpts_w ) ;
 	removeUnreachablePointMarkers( );
 	setUnreachbleMarkers( unreachable_fpts_w );
 

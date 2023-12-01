@@ -183,6 +183,7 @@ set_target_properties( neuro_explorer PROPERTIES
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node example/neuro_explorer_node.cpp)
 add_executable(viz_helper_node example/viz_helper_node.cpp)
+add_executable(scan2ptcloud_node example/scan_to_ptcloud_node.cpp)
 
 #add_executable(travel_tracker example/travel_tracker.py)
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -193,6 +194,7 @@ add_dependencies(viz_helper_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 
 target_link_libraries(${PROJECT_NAME}_node neuro_explorer )
 target_link_libraries(viz_helper_node neuro_explorer)
+target_link_libraries(scan2ptcloud_node neuro_explorer)
 
 #target_link_libraries(travel_tracker neuro_explorer)
 
@@ -235,9 +237,9 @@ install(TARGETS viz_helper_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-# install(TARGETS scan2ptcloud_node
-#     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+install(TARGETS scan2ptcloud_node
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 #install(TARGETS travel_tracker
 #    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

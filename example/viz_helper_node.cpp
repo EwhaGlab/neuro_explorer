@@ -81,7 +81,7 @@ int main(int argc, char** argv)
 
   ros::WallTime start_, end_;
 
-  ROS_INFO("Initializing viz helper \n");
+  ROS_INFO("Starting viz_helper_node\n");
   VizHelper viz_helper(private_nh, nh);
   ros::spinOnce();
   //front_detector_dms.initmotion();

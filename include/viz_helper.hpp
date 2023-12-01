@@ -105,8 +105,8 @@ public:
 
 	void setGlobalFrontierRegionMarkers(const vector<geometry_msgs::Point32>& globalfr_w, visualization_msgs::Marker& vizfr_markers );
 	void setLocalFrontierRegionMarkers( const vector<geometry_msgs::Point32>& localfr_w );
-	void setGlobalFrontierPointMarkers( const vector<geometry_msgs::Point32>& vo_globalfpts_gm ) ;
-	void setLocalFrontierPointMarkers(  const vector<geometry_msgs::Point32>& vo_localfpts_gm ) ;
+	void setGlobalFrontierPointMarkers( const geometry_msgs::Point32& target_goal, const vector<geometry_msgs::Point32>& vo_globalfpts_gm ) ;
+	void setLocalFrontierPointMarkers(  const geometry_msgs::Point32& target_goal, const vector<geometry_msgs::Point32>& vo_localfpts_gm ) ;
 	void setUnreachbleMarkers( const vector<geometry_msgs::Point32>& unreachable_pt );
 
 //	void publishDoneExploration() ;
@@ -170,7 +170,7 @@ private:
 					m_marker_optcov_regionPub, m_marker_optastar_regionPub, m_marker_optensembled_regionPub, m_active_boundPub,
 					m_makergoalPub,	m_currentgoalPub, m_marker_unreachpointPub;
 
-	visualization_msgs::Marker  m_frontier_region_markers, m_targetgoal_marker, m_optimaltarget_marker ;
+	visualization_msgs::Marker  m_targetgoal_marker, m_optimaltarget_marker ;
 	visualization_msgs::MarkerArray m_global_frontierpoint_markers, m_local_frontierpoint_markers, m_unreachable_markers ;
 
 	neuro_explorer::VizDataStamped m_vizdata ;
