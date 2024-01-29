@@ -98,7 +98,7 @@ ROS_INFO("global map size (%d %d) and dnn input size (%d %d): \n", mn_globalmap_
 	m_frontiers_region_thr = nweakcomp_threshold / mn_scale ;
 	mn_roi_size = static_cast<int>( round( mf_robot_radius / mf_resolution ) ) * 2 ; // we never downsample costmap !!! dont scale it with roisize !!
 
-	mn_globalmap_centx = mn_globalmap_width  / 2 ;
+	mn_globalmap_centx = mn_globalmap_width  / 2 ; // 3096 / 2  (params for WG)
 	mn_globalmap_centy = mn_globalmap_height / 2 ;
 
 	//m_unreachpointPub 		 = m_nh.advertise<geometry_msgs::PoseStamped>("unreachable_posestamped",10);
@@ -282,6 +282,7 @@ void NeuroExplorer::initalize_astar_model( )
 	if(TF_GetCode(mptf_astar_Status) == TF_OK)
 	{
 		printf("TF_LoadSessionFromSavedModel OK at the init state\n");
+		printf("loading A* net from %s\n", m_str_astar_modelfilepath.c_str());
 	}
 	else
 	{
@@ -365,7 +366,7 @@ void NeuroExplorer::initalize_covrew_model( )
 	mpptf_covrew_output_values = (TF_Tensor**)malloc(sizeof(TF_Tensor*)*NumOutputs);
 
 	//*** data allocation
-	mpf_covrew_data = new float[ mn_cnn_height * mn_cnn_width * 1 ]; // input_map is 3ch 512 x 512
+	mpf_covrew_data = new float[ mn_cnn_height * mn_cnn_width * 2 ]; // input_map is 2ch 512 x 512 x 2... set it 1 ch if discrete class is used
 //	mpf_covrew_result = new float[ mn_processed_gmap_height * mn_processed_gmap_width * 3 ];
 }
 
@@ -571,23 +572,24 @@ void NeuroExplorer::publishVizMarkers( bool bviz_flag )
 //		{
 //			for(int jj=0; jj < mvvo_localfr_gm[ii].size(); jj++)
 //			{
-//				fr.x = (float)mvvo_localfr_gm[ii][jj].x ;
-//				fr.y = (float)mvvo_localfr_gm[ii][jj].y ;
-//				m_vizdata.frontier_region_w.push_back(gfr);
+//				cv::Point2f pt = gridmap2world( mvvo_globalfr_gm[ii][jj] );
+//				fr.x = (float)pt.x ;
+//				fr.y = (float)pt.y ;
+//				vizdata.global_frontier_region_w.push_back(fr); // doesn't matter if it is local or global
 //			}
 //		}
 
-		// global fr
-		for( int ii=0; ii < mvvo_globalfr_gm.size() ; ii++)
-		{
-			for(int jj=0; jj < mvvo_globalfr_gm[ii].size(); jj++)
-			{
-				cv::Point2f pt = gridmap2world( mvvo_globalfr_gm[ii][jj] );
-				fr.x = (float)pt.x ;
-				fr.y = (float)pt.y ;
-				vizdata.global_frontier_region_w.push_back(fr);
-			}
-		}
+//		// global fr
+//		for( int ii=0; ii < mvvo_globalfr_gm.size() ; ii++)
+//		{
+//			for(int jj=0; jj < mvvo_globalfr_gm[ii].size(); jj++)
+//			{
+//				cv::Point2f pt = gridmap2world( mvvo_globalfr_gm[ii][jj] );
+//				fr.x = (float)pt.x ;
+//				fr.y = (float)pt.y ;
+//				vizdata.global_frontier_region_w.push_back(fr);
+//			}
+//		}
 
 		// local fpts
 		for(int ii=0; ii < mvo_localfpts_gm.size(); ii++)
@@ -685,8 +687,8 @@ void NeuroExplorer::initGlobalmapimgs( const int& cmheight, const int& cmwidth, 
 		{
 			int8_t occupancy = m_gridmap.data[ ii * cmwidth + jj ]; // dynamic gridmap size
 			int8_t obs_cost  = globalcostmap.data[ ii * cmwidth + jj] ;
-			int y_ = (mn_orig_y_wrt_cent + ii) ;
-			int x_ = (mn_orig_x_wrt_cent + jj) ;
+			int y_ = (mn_globalmap_yc_ + ii) ;
+			int x_ = (mn_globalmap_xc_ + jj) ;
 
 			if ( occupancy < 0 && obs_cost < 0)
 			{
@@ -702,17 +704,15 @@ void NeuroExplorer::initGlobalmapimgs( const int& cmheight, const int& cmwidth, 
 			}
 		}
 	}
-
 //ROS_INFO("mcvu_globalmapimg has been processed %d %d \n", mcvu_globalmapimg.rows, mcvu_globalmapimg.cols );
-
 // process costmap
 	for( int ii =0 ; ii < cmheight; ii++)
 	{
 		for( int jj = 0; jj < cmwidth; jj++)
 		{
 			int8_t val  = globalcostmap.data[ ii * cmwidth + jj] ;
-			int y_ = (mn_orig_y_wrt_cent + ii) ;
-			int x_ = (mn_orig_x_wrt_cent + jj) ;
+			int y_ = (mn_globalmap_yc_ + ii) ;
+			int x_ = (mn_globalmap_xc_ + jj) ;
 			mcvu_costmapimg.data[ y_ * mn_globalmap_width + x_ ] = 	val < 0 ? 255 : mp_cost_translation_table[val];
 		}
 	}
@@ -720,19 +720,21 @@ void NeuroExplorer::initGlobalmapimgs( const int& cmheight, const int& cmwidth, 
 
 void NeuroExplorer::copyFRtoGlobalmapimg( const cv::Rect& roi_active_ds, const cv::Mat& fr_img )
 {
-	// fr_img (ds) : 512 x 512
-	// mcvu_globalfrimg_ds : 1024 x 1024
+	// fr_img (ds) 			: 512 x 512
+	// mcvu_globalfrimg 	: 4096 x 4096
+	// mcvu_globalfrimg_ds 	: 2048 x 2048
 	cv::Mat map_active ; // partial (on reconstructing map)
 	map_active = mcvu_globalfrimg_ds( roi_active_ds );
 	fr_img.copyTo(map_active);
 }
 
-int  NeuroExplorer::locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& nxoffset, const int& nyoffset, vector<vector<cv::Point>>& contours_gm, vector<FrontierPoint>& frontier_cands_gm   )
+int  NeuroExplorer::locateGlobalFRnFptsFromGlobalFRimg( const cv::Mat& FR_in_globds, const cv::Point& rpos_gmds,  const cv::Point& am_orig_ds, vector<vector<cv::Point>>& contours_gm, vector<FrontierPoint>& frontier_cands_gm   )
 {
+// input cvFRimg is globalmap
 // frontier_cands_gm refers to frontiers in the orig gridmap coord
-	vector<vector<cv::Point> > contours_plus_offset ;
+	vector<vector<cv::Point> > contours_glob_ds ;
 	vector<cv::Vec4i> opt_hierarchy;
-	cv::findContours( cvFRimg, contours_plus_offset, opt_hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE );
+	cv::findContours( FR_in_globds, contours_glob_ds, opt_hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE );
 
 	const int cmheight = m_gridmap.info.height ;
 	const int cmwidth  = m_gridmap.info.width ;
@@ -742,9 +744,8 @@ int  NeuroExplorer::locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& n
 	const float fox = m_gridmap.info.origin.position.x ;
 	const float foy = m_gridmap.info.origin.position.y ;
 
-
 	int num_valid_frontier_point = 0;
-	if( contours_plus_offset.size() == 0 )
+	if( contours_glob_ds.size() == 0 )
 	{
 		ROS_WARN("There is no opt FR region in the input map img\n");
 		return 0;
@@ -752,43 +753,43 @@ int  NeuroExplorer::locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& n
 	else // We found opt fr in the current map. We append the new opt points to m_curr_frontier_set accordingly
 	{
 		geometry_msgs::Point point_w;
-		vector<cv::Point> vecents_offset;  // shifted by the offet param
-		for(int i=0; i < contours_plus_offset.size(); i++)
+		vector<cv::Point> vecents_glob_ds;  // shifted by the offet param
+		for(int i=0; i < contours_glob_ds.size(); i++)
 		{
 			int nx =0, ny =0 ;
-			vector<cv::Point> fr_plus_offset = contours_plus_offset[i]; // FR is in mcvu_globamap_ds
-			int ncnt = fr_plus_offset.size() ;
+			vector<cv::Point> fr_glob_ds = contours_glob_ds[i]; // FR is in mcvu_globamap_ds
+			int ncnt = fr_glob_ds.size() ;
 			CV_Assert(ncnt > 0);
-			for( int j=0; j < fr_plus_offset.size(); j++)
+			for( int j=0; j < fr_glob_ds.size(); j++)
 			{
-				nx += fr_plus_offset[j].x ;
-				ny += fr_plus_offset[j].y ;
+				nx += fr_glob_ds[j].x ;
+				ny += fr_glob_ds[j].y ;
 	//			ROS_INFO("%d %d / %d %d \n", contour_plus_offset[j].x, contour_plus_offset[j].y, img_plus_offset.rows, img_plus_offset.cols );
 			}
 			int ncx = nx / ncnt ;
 			int ncy = ny / ncnt ;
 			cv::Point ncent( ncx,  ncy ) ;
-			vecents_offset.push_back( ncent );
+			vecents_glob_ds.push_back( ncent );
 		}
-		CV_Assert( contours_plus_offset.size() == vecents_offset.size() );
+		CV_Assert( contours_glob_ds.size() == vecents_glob_ds.size() );
 
-		for( int i = 0; i < contours_plus_offset.size(); i++ )
+		for( int i = 0; i < contours_glob_ds.size(); i++ )
 		{
-			vector<cv::Point> fr_plus_offset = contours_plus_offset[i] ;
-			if(fr_plus_offset.size() < m_frontiers_region_thr ) // don't care about small frontier regions
+			vector<cv::Point> fr_glob_ds = contours_glob_ds[i] ;
+			if(fr_glob_ds.size() < m_frontiers_region_thr ) // don't care about small frontier regions
 				continue ;
 
-			int ncentx_offset = vecents_offset[i].x ;
-			int ncenty_offset = vecents_offset[i].y ;
+			int ncentx_glob_ds = vecents_glob_ds[i].x ;
+			int ncenty_glob_ds = vecents_glob_ds[i].y ;
 
 			int nmindist = 10000000 ;
 			int nmindistidx = -1;
 
-			for (int j=0; j < fr_plus_offset.size(); j++)
+			for (int j=0; j < fr_glob_ds.size(); j++)
 			{
-				int nx = fr_plus_offset[j].x ;
-				int ny = fr_plus_offset[j].y ;
-				int ndist = std::sqrt( (nx - ncentx_offset) * (nx - ncentx_offset) + (ny - ncenty_offset) * (ny - ncenty_offset) );
+				int nx = fr_glob_ds[j].x ;
+				int ny = fr_glob_ds[j].y ;
+				int ndist = std::sqrt( (nx - ncentx_glob_ds) * (nx - ncentx_glob_ds) + (ny - ncenty_glob_ds) * (ny - ncenty_glob_ds) );
 				if(ndist < nmindist)
 				{
 					nmindist = ndist ;
@@ -797,25 +798,22 @@ int  NeuroExplorer::locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& n
 			}
 
 			CV_Assert(nmindistidx >= 0);
-			cv::Point frontier_offset = fr_plus_offset[nmindistidx];
+			cv::Point frontier_glob_ds = fr_glob_ds[nmindistidx];
 
 			//ROS_WARN(" %d %d \n", frontier_offset.x, frontier_offset.y);
 
-			cv::Point frontier_gm_ds ;
-			frontier_gm_ds.x = frontier_offset.x - nxoffset ; // tform back to the down-sampled grid-map coord
-			frontier_gm_ds.y = frontier_offset.y - nyoffset ;
-
-			FrontierPoint oPoint( frontier_gm_ds * mn_scale, cmheight, cmwidth, foy, fox, cmresolution, 0 );
+			// frontier_glob is found from globalmap_ds !!!, thus transformed gm must be in the downsampled coord
+			cv::Point frontier_gmds = globalmapDS_to_gridmapDS( frontier_glob_ds, rpos_gmds, am_orig_ds );
+			FrontierPoint oPoint_gm( frontier_gmds * mn_scale, cmheight, cmwidth, foy, fox, cmresolution, 0 );
 
 	/////////////////////////////////////////////////////////////////////
 	// 				We need to run position correction here
 	/////////////////////////////////////////////////////////////////////
-			cv::Point init_pt 		= oPoint.GetInitGridmapPosition() ; 	// position @ ds0 (original sized map)
-			cv::Point corrected_pt	= oPoint.GetCorrectedGridmapPosition() ;
+			cv::Point init_pt 		= oPoint_gm.GetInitGridmapPosition() ; 	// position @ ds0 (original sized map)
+			cv::Point corrected_pt	= oPoint_gm.GetCorrectedGridmapPosition() ;
 			correctFrontierPosition( m_gridmap, init_pt, mn_correctionwindow_width, corrected_pt  );
-
-			oPoint.SetCorrectedCoordinate(corrected_pt);
-			frontier_cands_gm.push_back(oPoint);
+			oPoint_gm.SetCorrectedCoordinate(corrected_pt);
+			frontier_cands_gm.push_back(oPoint_gm);
 		}
 
 		// run filter
@@ -854,45 +852,235 @@ int  NeuroExplorer::locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& n
 		}
 	}
 
-	contours_gm = contours_plus_offset ;
-	for( int ii=0; ii < contours_plus_offset.size(); ii++ )
+	contours_gm = contours_glob_ds ;
+	for( int ii=0; ii < contours_glob_ds.size(); ii++ )
 	{
-		for( int jj=0; jj < contours_plus_offset[ii].size(); jj++ )
+		for( int jj=0; jj < contours_glob_ds[ii].size(); jj++ )
 		{
-			contours_gm[ii][jj].x = ( contours_plus_offset[ii][jj].x - nxoffset ) * mn_scale ;
-			contours_gm[ii][jj].y = ( contours_plus_offset[ii][jj].y - nyoffset ) * mn_scale ;
+			contours_gm[ii][jj] = globalmapDS_to_gridmapDS( contours_glob_ds[ii][jj], rpos_gmds, am_orig_ds ) * mn_scale ;
 		}
 	}
 
-//	char tmp0[200], tmp1[200];
-//	sprintf(tmp0, "%s/fpts%04d.txt", m_str_debugpath.c_str(), nxoffset) ;
-//	string str_fpts_costmap(tmp0);
-//	ofstream ofs_fpts(str_fpts_costmap) ;
-//	for(int ii = 0; ii < frontier_cands_gm.size(); ii++)
-//	{
-//		cv::Point pt = frontier_cands_gm[ii].GetCorrectedGridmapPosition() ;
-//		ofs_fpts << pt.x << " " << pt.y << endl;
-////ROS_INFO("%d %f %f \n",nxoffset, frontier_cands_gm[ii].GetCorrectedWorldPosition().x, frontier_cands_gm[ii].GetCorrectedWorldPosition().y);
-////		ROS_INFO("%f %f \n", pt_w.x, pt_w.y );
-////		ROS_INFO("%f %f %f \n", m_gridmap.info.origin.position.x, m_gridmap.info.origin.position.y, m_gridmap.info.resolution);
-//	}
-//	ofs_fpts.close();
-//
-//	sprintf(tmp1, "%s/fr%04d.txt", m_str_debugpath.c_str(), nxoffset) ;
-//	string str_fr_costmap(tmp1);
-//	ofstream ofs_fr(str_fr_costmap) ;
-//	for(int ii = 0; ii < contours_gm.size(); ii++)
-//	{
-//		for( int jj=0; jj < contours_gm[ii].size(); jj++)
-//		{
-//			cv::Point pt = contours_gm[ii][jj];
-//			ofs_fr << pt.x << " " << pt.y << endl;
-//		}
-//	}
-//	ofs_fr.close();
+	return num_valid_frontier_point;
+}
+
+int NeuroExplorer::locateFptsFromPredimg( const cv::Mat& potmap_prediction, const cv::Mat& covrew_prediction,
+		const vector<cv::Point>& FRcents_gm, const cv::Point& rpos_gmds, const cv::Point& amds_roi_orig, vector<FrontierPoint>& fpts_gm  )
+{
+// input: potmap_prediction & covrew_prediction (found in active map )
+
+	cv::Mat potmap_prediction_32f = (potmap_prediction * 255.f) ;
+	cv::Mat potmap_prediction_8u, potmap_prediction_bin, ensembled_prediction_8u_thr ;
+	potmap_prediction_32f.convertTo(potmap_prediction_8u, CV_8U);
+	cv::threshold(potmap_prediction_8u, potmap_prediction_bin, 25, 255, cv::THRESH_BINARY);
+
+//char tmppred[200];
+//sprintf(tmppred,"%s/ensembled_prediction_thrbin%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+//cv::imwrite(tmppred, ensembled_prediction_bin );
+
+	cv::Mat nonzerocoords_am;
+	findNonZero(potmap_prediction_bin, nonzerocoords_am);
+
+	const int cmheight = m_gridmap.info.height ;
+	const int cmwidth  = m_gridmap.info.width ;
+	const float cmresolution = m_gridmap.info.resolution ;
+	vector<signed char> gmdata = m_gridmap.data ;
+	vector<signed char> cmdata = m_globalcostmap.data ;
+	const float fox = m_gridmap.info.origin.position.x ;
+	const float foy = m_gridmap.info.origin.position.y ;
+	int num_valid_frontier_point = 0;
+
+	for( int nidx = 0; nidx < FRcents_gm.size(); nidx++ )
+	{
+		//cv::Point frontier_gm_ds ;
+		int nx_gmds = (int)FRcents_gm[nidx].x / mn_scale; //local_candpoints_plus_offset[i].x - nxoffset ; // tform back to the down-sampled grid-map coord
+		int ny_gmds = (int)FRcents_gm[nidx].y / mn_scale; //local_candpoints_plus_offset[i].y - nyoffset ;
+
+		// get coordinates of
+		int nminidx = 0 ;
+		int nmindist = 10000000000;
+		for( int ii =0; ii < nonzerocoords_am.total(); ii++ )
+		{
+			cv::Point pt_am = nonzerocoords_am.at<cv::Point>(ii) ;
+			cv::Point pt_gmds = activemap_to_gridmapDS( pt_am, rpos_gmds );
+			 int mydist = ( nx_gmds - pt_gmds.x ) * ( nx_gmds - pt_gmds.x ) +
+					 	  ( ny_gmds - pt_gmds.y ) * ( ny_gmds - pt_gmds.y )  ;
+			 if( mydist < nmindist )
+			 {
+				 nmindist = mydist ;
+				 nminidx = ii ;
+			 }
+		}
+		// the closest neighboring valid pot point (FR) w.r.t the current centroid
+		cv::Point matched_pt_am = nonzerocoords_am.at<cv::Point>(nminidx) ;
+		cv::Point matched_pt_gmds = activemap_to_gridmapDS( matched_pt_am, rpos_gmds );
+
+		FrontierPoint oPoint_gm( matched_pt_gmds * mn_scale, cmheight, cmwidth, foy, fox, cmresolution, 0 );
+/////////////////////////////////////////////////////////////////////
+// 				We need to run position correction here
+/////////////////////////////////////////////////////////////////////
+		cv::Point init_pt 		= oPoint_gm.GetInitGridmapPosition() ; 	// position @ ds0 (original sized map)
+		cv::Point corrected_pt	= oPoint_gm.GetCorrectedGridmapPosition() ;
+		correctFrontierPosition( m_gridmap, init_pt, mn_correctionwindow_width, corrected_pt  );
+		cv::Point corrected_pt_am = gridmapDS_to_activemap( corrected_pt / mn_scale, rpos_gmds );
+
+		oPoint_gm.mf_potvalue = potmap_prediction.at<float>( corrected_pt_am.y, corrected_pt_am.x );
+		oPoint_gm.mf_vizvalue = covrew_prediction.at<float>( corrected_pt_am.y, corrected_pt_am.x );
+		oPoint_gm.mf_ensembled_value = 0.5 * oPoint_gm.mf_potvalue + 0.5 * oPoint_gm.mf_vizvalue ;
+		oPoint_gm.SetCorrectedCoordinate(corrected_pt);
+		fpts_gm.push_back(oPoint_gm);
+	}
+
+// sort fpts_gm by mf_value
+	std::sort(fpts_gm.begin(), fpts_gm.end(), sort_by_ensembled_value() ) ;
+
+	// run filter
+	const float fcm_conf_thr = mo_frontierfilter.GetCostmapConf() ;
+	const float fgm_conf_thr = mo_frontierfilter.GetGridmapConf() ;
+
+	// eliminate frontier points at obtacles
+	if( m_globalcostmap.info.width > 0 )
+	{
+		mo_frontierfilter.measureCostmapConfidence(m_globalcostmap, fpts_gm);
+//ROS_INFO("done CM filter \n");
+		mo_frontierfilter.measureGridmapConfidence(m_gridmap, fpts_gm);
+//ROS_INFO("done GM filter \n");
+		for(size_t idx=0; idx < fpts_gm.size(); idx++)
+		{
+			cv::Point frontier_in_gm = fpts_gm[idx].GetCorrectedGridmapPosition();
+			bool bisfrontier = is_frontier_point(frontier_in_gm.x, frontier_in_gm.y, cmwidth, cmheight, gmdata );
+			int gmidx = cmwidth * frontier_in_gm.y + frontier_in_gm.x ;
+			bool bisexplored = cmdata[gmidx] >=0 ? true : false ;
+			fpts_gm[idx].SetFrontierFlag( fcm_conf_thr, fgm_conf_thr, bisexplored, bisfrontier );
+
+//ROS_INFO("fpt %d %d (gmconf: %f) (cmconf: %f) \n", fpts_gm[idx].GetCorrectedGridmapPosition().x, fpts_gm[idx].GetCorrectedGridmapPosition().y,
+//												   fpts_gm[idx].GetGMConfidence(), fpts_gm[idx].GetCMConfidence() );
+
+			if( fpts_gm[idx].isConfidentFrontierPoint() )
+				num_valid_frontier_point++;
+//ROS_INFO("%f %f %d %d\n", voFrontierCands[idx].GetInitWorldPosition().x, voFrontierCands[idx].GetInitWorldPosition().y,
+//						  voFrontierCands[idx].GetCorrectedGridmapPosition().x, voFrontierCands[idx].GetCorrectedGridmapPosition().y);
+
+		}
+		set<pointset> unreachable_frontiers;
+		{
+			const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set) ;
+			unreachable_frontiers = m_unreachable_frontier_set ;
+		}
+		mo_frontierfilter.computeReachability( unreachable_frontiers, fpts_gm );
+	}
+
+ROS_INFO("locateFptsFromPredimg() has found %d num of fpts in gm initially. Then, %d of them are classified as valid fpts \n", fpts_gm.size(), num_valid_frontier_point );
 
 	return num_valid_frontier_point;
 }
+
+int NeuroExplorer::locateFRfromFRimg( const cv::Mat& FR_in_am, const cv::Point& rpos_gmds, const cv::Point& am_orig_ds, vector<vector<cv::Point>>& contours_gm, vector<cv::Point>& FRcents_gm )
+{
+	// input : FR_in_am // FR found in processed_gmap (active map)
+	// output contourcents_gm_ds are uncorrected centroids of FR in downsampled gridmap coordinate
+
+	vector<vector<cv::Point> > contours_am ; // FR in active map
+	vector<cv::Vec4i> opt_hierarchy;
+	cv::findContours( FR_in_am, contours_am, opt_hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE );
+
+	contours_gm = contours_am ;
+	for( int ii=0; ii < contours_am.size(); ii++ )
+	{
+		for( int jj=0; jj < contours_am[ii].size(); jj++ )
+		{
+			contours_gm[ii][jj] = activemap_to_gridmapDS( contours_am[ii][jj], rpos_gmds ) * mn_scale;
+//ROS_WARN("FR gm: %d %d \n", contours_gm[ii][jj].x, contours_gm[ii][jj].y);
+		}
+	}
+//ROS_ASSERT(0);
+
+	const int cmheight = m_gridmap.info.height ;
+	const int cmwidth  = m_gridmap.info.width ;
+	const float cmresolution = m_gridmap.info.resolution ;
+	vector<signed char> gmdata = m_gridmap.data ;
+	vector<signed char> cmdata = m_globalcostmap.data ;
+	const float fox = m_gridmap.info.origin.position.x ;
+	const float foy = m_gridmap.info.origin.position.y ;
+	int num_valid_frontier_point = 0;
+
+	if( contours_gm.size() == 0 )
+	{
+		ROS_WARN("There is no opt FR region in the input map img\n");
+		return 0;
+	}
+	else // We found opt fr in the current map. We append the new opt points to m_curr_frontier_set accordingly
+	{
+		geometry_msgs::Point point_w;
+		vector<cv::Point> vecents_gm;  // shifted by the offet param
+		for(int i=0; i < contours_gm.size(); i++)
+		{
+			int nx =0, ny =0 ;
+			vector<cv::Point> fr_gm = contours_gm[i]; // FR is in mcvu_globamap_ds
+			int ncnt = fr_gm.size() ;
+			CV_Assert(ncnt > 0);
+			for( int j=0; j < fr_gm.size(); j++)
+			{
+				nx += fr_gm[j].x ;
+				ny += fr_gm[j].y ;
+	//			ROS_INFO("%d %d / %d %d \n", contour_plus_offset[j].x, contour_plus_offset[j].y, img_plus_offset.rows, img_plus_offset.cols );
+			}
+			int ncx = nx / ncnt ;
+			int ncy = ny / ncnt ;
+			cv::Point ncent( ncx,  ncy ) ;
+			vecents_gm.push_back( ncent );
+		}
+		CV_Assert( contours_gm.size() == vecents_gm.size() );
+
+		for( int i = 0; i < contours_gm.size(); i++ )
+		{
+			vector<cv::Point> fr_gm = contours_gm[i] ;
+			if(fr_gm.size() < m_frontiers_region_thr ) // don't care about small frontier regions
+				continue ;
+
+			int ncentx_gm = vecents_gm[i].x ;
+			int ncenty_gm = vecents_gm[i].y ;
+
+			int nmindist = 10000000 ;
+			int nmindistidx = -1;
+
+			for (int j=0; j < fr_gm.size(); j++)
+			{
+				int nx = fr_gm[j].x ;
+				int ny = fr_gm[j].y ;
+				int ndist = std::sqrt( (nx - ncentx_gm) * (nx - ncentx_gm) + (ny - ncenty_gm) * (ny - ncenty_gm) );
+				if(ndist < nmindist)
+				{
+					nmindist = ndist ;
+					nmindistidx = j ;
+				}
+			}
+
+			CV_Assert(nmindistidx >= 0);
+			cv::Point frontier_gm = fr_gm[nmindistidx];
+
+//			cv::Point frontier_gmds ;
+//			frontier_gmds.x = frontier_gm.x  / mn_scale ; // tform back to the down-sampled grid-map coord
+//			frontier_gmds.y = frontier_gm.y  / mn_scale;
+
+//ROS_WARN(" %d %d %d %d \n", frontier_gm.x, frontier_gm.y, frontier_gmds.x, frontier_gmds.y);
+
+	/////////////////////////////////////////////////////////////////////
+	// 				We need to run position correction here
+	/////////////////////////////////////////////////////////////////////
+//			FrontierPoint oPoint( frontier_gm_ds * mn_scale, cmheight, cmwidth, foy, fox, cmresolution, 0 );
+//			cv::Point init_pt 		= oPoint.GetInitGridmapPosition() ; 	// position @ ds0 (original sized map)
+//			cv::Point corrected_pt	= oPoint.GetCorrectedGridmapPosition() ;
+//			correctFrontierPosition( m_gridmap, init_pt, mn_correctionwindow_width, corrected_pt  );
+//
+//			oPoint.SetCorrectedCoordinate(corrected_pt);
+//			contourcents_gm.push_back(oPoint);
+			FRcents_gm.push_back(frontier_gm); //uncorrected centroids of FR in downsampled gridmap coordinate
+		}
+	}
+	return FRcents_gm.size();
+}
+
 
 void NeuroExplorer::globalCostmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
@@ -1107,7 +1295,7 @@ void NeuroExplorer::updateUnreachablePointSet( const nav_msgs::OccupancyGrid& gl
 
 }
 
-int NeuroExplorer::selectNextBestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  )
+int NeuroExplorer::selectNextClosestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  )
 {
 	std::vector<cv::Point2f> cvfrontierpoints;
 	cv::Point2f cvrobotpoint( robotpose.pose.position.x, robotpose.pose.position.y );
@@ -1134,6 +1322,13 @@ int NeuroExplorer::selectNextBestPoint( const geometry_msgs::PoseStamped& robotp
 	nextbestpoint.header.stamp = ros::Time::now();
 
 	return 1;
+}
+
+int NeuroExplorer::selectNextBestPoint( const vector<geometry_msgs::PoseStamped>& vmsg_frontierpoints, int nbestidx, geometry_msgs::PoseStamped& nextbestpoint  )
+{
+	nextbestpoint = vmsg_frontierpoints[nbestidx+1];
+	nextbestpoint.header.frame_id = m_worldFrameId ;
+	nextbestpoint.header.stamp = ros::Time::now();
 }
 
 int NeuroExplorer::moveBackWard()
@@ -1183,8 +1378,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	m_globalcostmap = *msg ;
 	const nav_msgs::OccupancyGrid globalcostmap = m_globalcostmap;
 
-ROS_INFO("got costmap size of %d %d \n", m_globalcostmap.info.height, m_globalcostmap.info.width );
-
+//ROS_INFO("got costmap size of %d %d \n", m_globalcostmap.info.height, m_globalcostmap.info.width );
 	generateGridmapFromCostmap();
 
 	float cmresolution=globalcostmap.info.resolution;
@@ -1198,20 +1392,60 @@ ROS_INFO("got costmap size of %d %d \n", m_globalcostmap.info.height, m_globalco
 	cmdata =globalcostmap.data;
 	gmdata = m_gridmap.data;
 
-	// set the cent of the map as the init robot position (x, y)
-	// cv::Point Offset = compute_rpose_wrt_maporig() ;
+// print map info
+//ROS_INFO("map info @ curr callback==>   ox oy width height: %f %f %d %d\n", cmstartx, cmstarty, cmwidth, cmheight);
+
+// Set the cent of the map as the init world coordinate (0,0). This point could be the init robot position (x, y) w/ in real world experiment.
+// cv::Point Offset = compute_rpose_wrt_maporig() ;
 	m_rpos_world = GetCurrRobotPose( );
-	cv::Point Offset = world2gridmap( cv::Point2f( 0.f, 0.f ) ) ; // (0, 0) loc w.r.t the gmap orig (left, top)
+	cv::Point world_orig_in_gm = world2gridmap( cv::Point2f( 0.f, 0.f ) ) ; // (0,0) w.r.t the gmap orig (left, top). That is, (0,0)w --> (x,y)gm. e.g.) (288,0) in WG
 
-// set active ROI bounds
+/*******************************************************************************************************************************************************************
+// coord convention
+ * gridmap copied to a ROI of globalmap, then globalmap is downsampled to globalmap_ds
+ * Thus, gridmap_ds \in globalmap_ds and active_map \in globalmap_ds.
+ * active map (512 x 512) is downsampled!!
+ * globalmap_ds (2048x2048) is a downsampled globalmap (4096x4096)!!
+ * Thus, am, gmds, and glob_ds are defined in the same scale.
+ *
+ * Unify their scale first before bring them into the same coord frame.
+	Globalmap (.),  Gridmap (+)
+	.............................................................
+	.............................................................
+	.............................++++++++++++++++++++++++........
+	.............................++++++++++++++++++++++++........
+	.............................++++++++++++++++++++++++........
+	.............................++++++++++++++++++++++++........
+	........................(gmox,gmoy)++++++++++++++++++........
+	.............................................................
+	........................{wox(gcx), woy(gcy)}.................
+	.............................................................
+	.............................................................
+	.............................................................
+	.............................................................
+	.............................................................
+	.............................................................
+	(gox, goy)...................................................
 
-	mn_orig_x_wrt_cent = mn_globalmap_centx - Offset.x; // ox in gmap coordinate when the cent of gmap is the map orig
-	mn_orig_y_wrt_cent = mn_globalmap_centy - Offset.y; // ox in gmap coordinate when the cent of gmap is the map orig
-	cv::Point rpos_gm = world2gridmap( cv::Point2f( m_rpos_world.pose.position.x, m_rpos_world.pose.position.y ) );
-	cv::Point rpos_gm_wrt_mapcent = cv::Point( rpos_gm.x + mn_orig_x_wrt_cent, rpos_gm.y + mn_orig_y_wrt_cent );
-	int nx_roi_ds = rpos_gm_wrt_mapcent.x / mn_scale - mn_cnn_width  / 2 ;
-	int ny_roi_ds = rpos_gm_wrt_mapcent.y / mn_scale - mn_cnn_height / 2 ;
-	cv::Rect roi_active_ds( nx_roi_ds, ny_roi_ds, mn_cnn_width, mn_cnn_height ); //cmwidth, cmheight );
+	global map orig: (gox, goy)
+	(wox, woy) is on top of the globamap cent:  (gcx, gcy)
+	g : globalmap, l : localmap, gm: gridmap
+	gridmap belongs to globalmap
+*******************************************************************************************************************************************************************/
+
+// *******************************************************************************************************************************************************************
+// Set active ROI bounds
+// We want to align the gridmap origin on top of the center of my globalmap!!
+// mn_ox_wrt_cent is calculated for the alignment purpose.
+// *******************************************************************************************************************************************************************
+	mn_globalmap_xc_ = mn_globalmap_centx - world_orig_in_gm.x; // offset free global cent x (equivalent to globalmap_width / 2 or mn_globalmap_centx if the world is at (0,0) gm )
+	mn_globalmap_yc_ = mn_globalmap_centy - world_orig_in_gm.y; // offset free global cent y
+	m_rpos_gm = world2gridmap( cv::Point2f( m_rpos_world.pose.position.x, m_rpos_world.pose.position.y ) ) ;
+	cv::Point rpos_gm_wrt_gc = cv::Point( m_rpos_gm.x + mn_globalmap_xc_, m_rpos_gm.y + mn_globalmap_yc_ ) ; // rpos w.r.t (offset free) globalmap's centroid
+	int nox_roi_ds = rpos_gm_wrt_gc.x / mn_scale - mn_cnn_width  / 2 ;	// orig of active window ( left top point)
+	int noy_roi_ds = rpos_gm_wrt_gc.y / mn_scale - mn_cnn_height / 2 ;
+	m_roi_active_ds = cv::Rect( nox_roi_ds, noy_roi_ds, mn_cnn_width, mn_cnn_height ); //cmwidth, cmheight );
+	cv::Point amds_roi_orig( m_roi_active_ds.x, m_roi_active_ds.y );
 
 // set/init global gridmap and costmap images (mcvu_globalmapimg, mcvu_globalcostmap)
 	initGlobalmapimgs( cmheight, cmwidth, globalcostmap );
@@ -1220,10 +1454,10 @@ ros::WallTime DSstartTime = ros::WallTime::now();
 	if( mn_numpyrdownsample > 0)
 	{
 		// be careful here... using pyrDown() interpolates occ and free, making the boarder area (0 and 127) to be 127/2 !!
-		// 127 reprents an occupied cell !!!
+		// 127 represents an occupied cell !!!
 		for(int iter=0; iter < mn_numpyrdownsample; iter++ )
 		{
-			int nrows = mcvu_globalmapimg.rows; //% 2 == 0 ? img.rows : img.rows + 1 ;
+			int nrows = mcvu_globalmapimg.rows; // % 2 == 0 ? img.rows : img.rows + 1 ;
 			int ncols = mcvu_globalmapimg.cols; // % 2 == 0 ? img.cols : img.cols + 1 ;
 			//ROS_INFO("sizes orig: %d %d ds: %d %d \n", img_.rows, img_.cols, nrows/2, ncols/2 );
 			pyrDown(mcvu_globalmapimg, mcvu_globalmapimg_ds, cv::Size( ncols/2, nrows/2 ) );
@@ -1233,20 +1467,18 @@ ros::WallTime DSstartTime = ros::WallTime::now();
 ros::WallTime DSsendTime = ros::WallTime::now();
 double ds_time = (DSsendTime - DSstartTime).toNSec() * 1e-6;
 ROS_INFO("DS time: %f (ms) \n", ds_time);
-
-ROS_INFO("cent ox oy: %d %d \n", mn_orig_x_wrt_cent, mn_orig_y_wrt_cent) ;
-ROS_INFO("active roi: %d %d %d %d \n", nx_roi_ds, ny_roi_ds, mn_cnn_width, mn_cnn_height );
-//ROS_INFO("ox oy: %f %f rx_w ry_w: %f %f rx_g ry_g: %d %d\n", globalcostmap.info.origin.position.x, globalcostmap.info.origin.position.y,
-//		rpos_world.pose.position.x, rpos_world.pose.position.y, rpos_gm.x, rpos_gm.y ) ;
-
+ROS_INFO("offset free global map's cent: %d %d \n", mn_globalmap_xc_, mn_globalmap_yc_) ;
+ROS_INFO("active roi: %d %d %d %d \n", nox_roi_ds, noy_roi_ds, mn_cnn_width, mn_cnn_height );
+// ROS_INFO("ox oy: %f %f rx_w ry_w: %f %f rx_g ry_g: %d %d\n", globalcostmap.info.origin.position.x, globalcostmap.info.origin.position.y,
+// rpos_world.pose.position.x, rpos_world.pose.position.y, rpos_gm.x, rpos_gm.y ) ;
 // The robot is not moving (or ready to move)... we can go ahead plan the next action...
 // i.e.) We locate frontier points again, followed by publishing the new goal
 
-	cv::Mat map_active ; // partial (on reconstructing map)
-	map_active = mcvu_globalmapimg_ds( roi_active_ds );
+	cv::Mat map_active ; // partial (on reconstructing map) refers to local map
+	map_active = mcvu_globalmapimg_ds( m_roi_active_ds );
 
-ROS_INFO("roi (ds) info: <%d %d %d %d> \n", roi_active_ds.x, roi_active_ds.y, roi_active_ds.width, roi_active_ds.height) ;
-
+//ROS_INFO("roi (ds) info: <%d %d %d %d> \n", roi_active_ds.x, roi_active_ds.y, roi_active_ds.width, roi_active_ds.height) ;
+//ROS_ASSERT(0);
 //  ROI_OFFSET is needed for FFP seed. Not for neuro-explorer. So, we disable them ...
 //	uint8_t ukn = static_cast<uchar>(dffp::MapStatus::UNKNOWN) ;
 //	cv::Mat img_plus_offset = cv::Mat( img_active.rows + ROI_OFFSET*2, img_active.cols + ROI_OFFSET*2, CV_8U, cv::Scalar(ukn) ) ;
@@ -1262,36 +1494,33 @@ ROS_INFO("roi (ds) info: <%d %d %d %d> \n", roi_active_ds.x, roi_active_ds.y, ro
 
 char tmpgmap[200];
 sprintf(tmpgmap,"%s/processed_gmap%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
-cv::imwrite(tmpgmap, processed_gmap);
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/processed_gmap.png", processed_gmap);
+//cv::imwrite(tmpgmap, processed_gmap);
 
 ROS_INFO("begin DNN FR detection processed gmap size: %d %d \n", processed_gmap.rows, processed_gmap.cols);
 //////////////////////////////////////////////////////////////////////////////////////////////
 //			Run DNN FR prediction session
 //				-- the output FRs are in DS coordinate
 //////////////////////////////////////////////////////////////////////////////////////////////
-	cv::Mat fr_img = processed_gmap.clone();
+	cv::Mat FR_am = processed_gmap.clone();
 ros::WallTime GFFPstartTime = ros::WallTime::now();
-	run_tf_fr_detector_session(processed_gmap, fr_img);
+	run_tf_fr_detector_session(processed_gmap, FR_am);
 ros::WallTime GFFPendTime = ros::WallTime::now();
 double ffp_time = (GFFPendTime - GFFPstartTime ).toNSec() * 1e-6;
 ROS_INFO("done FR prediction \n");
 
 char tmptmp[200];
 sprintf(tmptmp,"%s/fr_img%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
-cv::imwrite(tmptmp, fr_img);
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/fr_img.png", fr_img);
-
+// cv::imwrite(tmptmp, fr_img);
 // get robot pose in the shifted gm image coordinate
-	//cv::Point rpos_gm = world2gridmap( cv::Point2f( rpos_world.pose.position.x, rpos_world.pose.position.y ) ) ; 	// rpose in orig gm
-	//rpos_gm = cv::Point( (rpos_gm.x + roi.x) / mn_scale, (rpos_gm.y + roi.y) / mn_scale ) ;  			// rpos in padded img --> rpos in ds img
-	cv::Point rpos_gmds = cv::Point( rpos_gm.x / mn_scale, rpos_gm.y / mn_scale ) ;  // rpose in active map down sampled (512 x 512 )
+// cv::Point rpos_gm = world2gridmap( cv::Point2f( rpos_world.pose.position.x, rpos_world.pose.position.y ) ) ; 	// rpose in orig gm
+// rpos_gm = cv::Point( (rpos_gm.x + roi.x) / mn_scale, (rpos_gm.y + roi.y) / mn_scale ) ;  			// rpos in padded img --> rpos in ds img
+	cv::Point rpos_gmds = cv::Point( m_rpos_gm.x / mn_scale, m_rpos_gm.y / mn_scale ) ;  // rpose in active map down sampled (512 x 512 )
 
 // cp fr_img (local) to global fr_img
-	copyFRtoGlobalmapimg( roi_active_ds, fr_img );
-cv::imwrite("/home/hankm/results/neuro_exploration_res/global_frimg_ds.png", mcvu_globalfrimg_ds);
-ROS_INFO("done copying fr_img to mcvu_globalfrimg_ds \n");
-
+	copyFRtoGlobalmapimg( m_roi_active_ds, FR_am );
+//sprintf(tmptmp, "%s//global_frimg_ds%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+//cv::imwrite(tmptmp, mcvu_globalfrimg_ds);
+//ROS_INFO("done copying fr_img to mcvu_globalfrimg_ds \n");
 	cv::Mat astar_net_input ;
 	//m_data_handler.transform_map_to_robotposition(fr_img, rpos_gmds.x, rpos_gmds.y, 0, fr_img_tformed) ;  // tform fr_img
 	//m_data_handler.transform_map_to_robotposition(processed_gmap, rpos_gmds.x, rpos_gmds.y, 127, gmap_tform) ;  // tform fr_img
@@ -1299,7 +1528,7 @@ ROS_INFO("done copying fr_img to mcvu_globalfrimg_ds \n");
 // TODO: check if gaussimg_32f has only one max vale (255) at the center of the image.
 	cv::Mat gaussimg_32f = m_data_handler.GetGaussianImg();
 // TODO: double-check with python training code to make sure obs-img is better than gridmap when generating astar_net_inputs.
-	m_data_handler.generate_astar_net_input(fr_img, processed_gmap, gaussimg_32f, astar_net_input);
+	m_data_handler.generate_astar_net_input(FR_am, processed_gmap, gaussimg_32f, astar_net_input);
 //cv::Mat bgr[3] ;
 //split(astar_net_input, bgr) ;
 //cv::Mat I0,I1,I2, G ;
@@ -1314,9 +1543,9 @@ ROS_INFO("done copying fr_img to mcvu_globalfrimg_ds \n");
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_tfrom.png", gmap_tform);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss_img.png", gaussimg_32f * 255.f);
 
-char tmpastar[200];
-sprintf(tmpastar,"/home/hankm/results/neuro_exploration_res/astar_net_input%04d.png", mn_mapcallcnt);
-cv::imwrite(tmpastar, astar_net_input * 255.f);
+//char tmpastar[200];
+//sprintf(tmpastar,"/home/hankm/results/neuro_exploration_res/astar_net_input%04d.png", mn_mapcallcnt);
+//cv::imwrite(tmpastar, astar_net_input * 255.f);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input * 255.f);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1329,51 +1558,51 @@ ros::WallTime GPstartTime = ros::WallTime::now();
 ros::WallTime GPendTime = ros::WallTime::now();
 double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 ROS_INFO("done potmap prediction \n");
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction );
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction * 255.f);
 
-ROS_INFO(" rpos_gm: %d %d  potmap size: %d %d \n", rpos_gm.x, rpos_gm.y, potmap_prediction.rows, potmap_prediction.cols );
+ROS_INFO(" rpos_gm: %d %d  potmap size: %d %d %d\n", m_rpos_gm.x, m_rpos_gm.y, potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.channels() );
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						run covrew prediction
 //////////////////////////////////////////////////////////////////////////////////////////////
 ros::WallTime CRstartTime = ros::WallTime::now();
 	cv::Mat covrew_prediction ;
-	run_tf_covrew_session( processed_gmap, covrew_prediction ) ;
+	cv::Mat viz_net_input;
+	m_data_handler.generate_viz_net_input(FR_am, processed_gmap, viz_net_input);
+//ROS_INFO(" covrew input data is ready %d %d %d\n", viz_net_input.rows, viz_net_input.cols, viz_net_input.channels());
+	run_tf_covrew_session( viz_net_input, covrew_prediction ); // output pred 0.f ~ 1.f
 ros::WallTime CRendTime = ros::WallTime::now();
 double covrew_time = (CRendTime - CRstartTime ).toNSec() * 1e-6;
 
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/covrew_net_output.png", covrew_prediction );
+//ROS_INFO(" done viznet prediction \n");
+//sprintf(tmpastar,"/home/hankm/results/neuro_exploration_res/covrew_net_input%04d.yml", mn_mapcallcnt);
+//cv::FileStorage fs(tmpastar, cv::FileStorage::WRITE);
+//fs << "mat1" << viz_net_input * 255.f;  // key, value store
+//fs.release();       // flush.
+//cv::imwrite("/home/hankm/results/neuro_exploration_res/covrew_net_output.png", covrew_prediction * 255.f );
 
+//CV_Assert(0);
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						Ensemble inv_potmap and covrew
 //////////////////////////////////////////////////////////////////////////////////////////////
 	cv::Mat ensembled_prediction = cv::Mat::zeros( potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.depth() );
 	ensemble_predictions(potmap_prediction, covrew_prediction, ensembled_prediction);
+	//cv::Mat ensembled_prediction = potmap_prediction ; // continous 0 ~ 1
 
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/ensembled_prediction.png", ensembled_prediction );
-
+char tmppred[200];
+sprintf(tmppred,"%s/ensembled_prediction%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmppred, ensembled_prediction * 255.f );
 	double covrew_minVal, covrew_maxVal;
 	cv::minMaxLoc( covrew_prediction, &covrew_minVal, &covrew_maxVal );
 	int ncovrew_maxVal = static_cast<int>(covrew_maxVal);
 ROS_INFO("max of covrew %f \n", covrew_maxVal);
 
-	double ensembled_minVal, ensembled_maxVal;
-	cv::minMaxLoc( ensembled_prediction, &ensembled_minVal, &ensembled_maxVal );
-	int nensembled_maxVal = static_cast<int>(ensembled_maxVal);
-	vector<PointClass> ensembled_labeled_points; //labeled_points_corrected ;
-	int num_labeled_points = assign_classes_to_points( ensembled_prediction, ensembled_labeled_points);
-	//std::sort(ensembled_labeled_points.begin(), ensembled_labeled_points.end(), class_cmp);  // causing double free corruption if used as is...
-	PointClassSet ensembled_point_class( rgb(0.f, 0.f, 1.f), rgb(1.f, 1.f, 0.f), nensembled_maxVal ) ;
-	cv::Mat cvopt_ensembled_prediction ;
-	cv::threshold(ensembled_prediction, cvopt_ensembled_prediction, ensembled_maxVal-1, 255, cv::THRESH_BINARY);
+//	vector<PointClass> ensembled_labeled_points; //labeled_points_corrected ;
+//	int num_labeled_points = assign_classes_to_points( ensembled_prediction, ensembled_labeled_points);
+//	PointClassSet ensembled_point_class( rgb(0.f, 0.f, 1.f), rgb(1.f, 1.f, 0.f), nensembled_maxVal ) ;
+//	cv::Mat cvopt_ensembled_prediction ;
+//	cv::threshold(ensembled_prediction, cvopt_ensembled_prediction, ensembled_maxVal-1, 255, cv::THRESH_BINARY);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/cvopt_ensembled_prediction.png", cvopt_ensembled_prediction);
-
-#ifdef FD_DEBUG_MODE
-	string outfilename =  m_str_debugpath + "/global_mapimg.png" ;
-//	cv::imwrite( outfilename.c_str(), m_uMapImg);
-//	cv::imwrite(m_str_debugpath + "/labeled_img.png", img);
-//	cv::imwrite(m_str_debugpath + "/img_frontiers.png",img_frontiers);
-#endif
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////// 		update unreachable frontiers;
@@ -1406,22 +1635,52 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 // Note that model_output_contours are found in DNN output img in which contains extra padding ( using roi ) to make fixed size: 512 512 img.
 // THe actual contours <contours_plus_offset> must be the ones found in actual gridmap (dynamic sized), thus we must remove the roi offset !!
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	int nx_globalorig_wrt_cent_ds = mn_orig_x_wrt_cent / 2 ;
-	int ny_globalorig_wrt_cent_ds = mn_orig_y_wrt_cent / 2 ;
-	vector<FrontierPoint> vo_globalfpts_gm ;
-	vector<vector<cv::Point>> vvo_globalfr_gm ;
-	int num_global_frontier_point = locateFRnFptsFromFRimg(mcvu_globalfrimg_ds, nx_globalorig_wrt_cent_ds, ny_globalorig_wrt_cent_ds, vvo_globalfr_gm, vo_globalfpts_gm) ;
-	mvvo_globalfr_gm  = vvo_globalfr_gm ;
-	mvo_globalfpts_gm = vo_globalfpts_gm;
-	int nx_localorig_wrt_cent_ds = nx_globalorig_wrt_cent_ds - nx_roi_ds  ; // do minus operation: i.e) frontier_offset - (offset)
-	int ny_localorig_wrt_cent_ds = ny_globalorig_wrt_cent_ds - ny_roi_ds  ;
+
+	//vector<FrontierPoint> vo_globalfpts_gm ;
+	//vector<vector<cv::Point>> vvo_globalfr_gm ;
+	//int num_global_frontier_point = locateGlobalFRnFptsFromGlobalFRimg(mcvu_globalfrimg_ds, rpos_gmds, amds_roi_orig, vvo_globalfr_gm, vo_globalfpts_gm) ;
+	//mvvo_globalfr_gm  = vvo_globalfr_gm ;
+	//mvo_globalfpts_gm = vo_globalfpts_gm;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//	로컬 맵에서 찾아진 fpts 들의 coord 위치가 neg (-, -) 값을 갖는 등 실제와 맞지 않는 문제점이 있음
+//	mn_globalmap_xc_ 값 등 coord 변환에 쓰이는 값들이 잘못 정의되어 있거나 빼고 더할 때 잘못 연산이 되는 등 문제가 있기 때문임.
+//  이러한 이유로 localmap (CNN)으로 찾은 fpts를 gridmap filter시 confidence가 0을 출력하게 되어 모두 filter가 되버리는 해괴한 상황이 벌어짐
+//  결과적으로 localmap 상에 있는 많은 frontier 점들이 무시되고 먼 global coord 상에 frontier로 planning이 되어 매우 비효율적임
+
+//  1. FR 값을 출력해보고 이것들을 matlab을 통하여 확인해 볼 것 !!!!
+//	2. mn_globalmap_xc_  부터 offset, 변환 과정들에 쓰이는 변수들을 다 확인해볼 것 !!
+
+// ==> gridmapDS_to_activemap 등 함수를 만들었고, 각 포인트 variable에 coord 명확하게 표기할 것 !!!
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	//int nx_localorig_wrt_cent_ds = ngmox_wrt_gcds - nox_roi_ds  ; // do minus operation: i.e) frontier_offset - (offset)
+	//int ny_localorig_wrt_cent_ds = ngmoy_wrt_gcds - noy_roi_ds  ;
 	vector<FrontierPoint> vo_localfpts_gm ;
 	vector<vector<cv::Point>> vvo_localfr_gm ;
-	int num_local_frontier_point = locateFRnFptsFromFRimg(cvopt_ensembled_prediction, nx_localorig_wrt_cent_ds, ny_localorig_wrt_cent_ds, vvo_localfr_gm, vo_localfpts_gm) ;
+	vector<cv::Point> vfrcents_gm;
+
+//ROS_WARN("global orig (%d %d)  in ds (%d %d) localorig_wrt_cent_ds (%d %d) \n", mn_globalmap_xc_, mn_globalmap_yc_, ngmox_wrt_gcds, ngmoy_wrt_gcds, nx_localorig_wrt_cent_ds, ny_localorig_wrt_cent_ds ) ;
+//ROS_ASSERT(0);
+
+	int num_localFRs = locateFRfromFRimg(FR_am, rpos_gmds, amds_roi_orig, vvo_localfr_gm, vfrcents_gm);
+	int num_local_frontier_point = locateFptsFromPredimg(potmap_prediction, covrew_prediction, vfrcents_gm, rpos_gmds, amds_roi_orig, vo_localfpts_gm) ;
+
 	mvvo_localfr_gm  = vvo_localfr_gm ;
 	mvo_localfpts_gm = vo_localfpts_gm;
-// update curr_frontier_set
+// update curr global_frontier_set
 	{
+//		const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
+//		for (size_t idx=0; idx < vo_globalfpts_gm.size(); idx++)
+//		{
+//			if( vo_globalfpts_gm[idx].isConfidentFrontierPoint() )
+//			{
+//				cv::Point2f frontier_in_world = vo_globalfpts_gm[idx].GetCorrectedWorldPosition() ;
+//				pointset pt( frontier_in_world.x, frontier_in_world.y );
+//				m_curr_frontier_set.insert( pt );
+//			}
+//		}
 		const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
 		for (size_t idx=0; idx < vo_localfpts_gm.size(); idx++)
 		{
@@ -1432,19 +1691,17 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 				m_curr_frontier_set.insert( pt );
 			}
 		}
-		for (size_t idx=0; idx < vo_globalfpts_gm.size(); idx++)
-		{
-			if( vo_globalfpts_gm[idx].isConfidentFrontierPoint() )
-			{
-				cv::Point2f frontier_in_world = vo_globalfpts_gm[idx].GetCorrectedWorldPosition() ;
-				pointset pt( frontier_in_world.x, frontier_in_world.y );
-				m_curr_frontier_set.insert( pt );
-			}
-		}
 	}
 
-ROS_INFO("global / local fpts : %d %d   size of curr_frontier_set: %d \n", num_global_frontier_point, num_local_frontier_point, m_curr_frontier_set.size()) ;
-cv::imwrite("/home/hankm/results/neuro_exploration_res/opt_ensembled_prediction.png", cvopt_ensembled_prediction);
+ROS_INFO("num local fr cents : %d  \n", num_localFRs ) ;
+ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_frontier_set.size(), num_local_frontier_point ) ;
+
+	if( num_local_frontier_point == 0 && m_curr_frontier_set.empty() )
+	{
+		ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
+		mb_explorationisdone = true;
+		return ;
+	}
 
 //////////////////////////////////////////////////////////////////////////////////
 // 1. use the fp corresponds to the min distance as the init fp. epsilon = A*(fp)
@@ -1453,48 +1710,12 @@ cv::imwrite("/home/hankm/results/neuro_exploration_res/opt_ensembled_prediction.
 //////////////////////////////////////////////////////////////////////////////////
 
 	geometry_msgs::PoseStamped goal;
-	nav_msgs::Path msg_frontierpoints ;
-
-	if(num_local_frontier_point == 0) // nothing found from DNN
+	//nav_msgs::Path msg_frontierpoints ;
+	vector<geometry_msgs::PoseStamped> vmsg_frontierpoints ;
+	bool bexpand_to_global = false ;
+	if(num_local_frontier_point > 0)
 	{
-ROS_WARN("DNN process could not locate any interesting FR. Go over all available fpts in the global map \n");
-
-		// try to go over global fpts
-		if( m_curr_frontier_set.size() == 0) //num_global_frontier_point == 0 )
-		{
-			// should terminate the exploration task if no more global fpts is available
-			ROS_WARN("Neither global nor local frontier points are available \n ");
-		}
-		else
-		{
-			for (const auto & pi : m_curr_frontier_set)
-			{
-				geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
-				tmp_goal.header.frame_id = m_worldFrameId ;
-				double fdist_sq = (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) * (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) +
-						( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) * ( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) ;
-				float fdist = sqrtf( static_cast<float>(fdist_sq) );
-				if (fdist > 1.f)
-					msg_frontierpoints.poses.push_back(tmp_goal);
-			}
-
-//			for( int idx =0; idx < vo_globalfpts_gm.size(); idx++)
-//			{
-//				cv::Point2f frontier_world = vo_globalfpts_gm[idx].GetCorrectedWorldPosition() ;
-//				geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( frontier_world.x, frontier_world.y, 0.f );
-//				tmp_goal.header.frame_id = m_worldFrameId ;
-//				double fdist_sq = (rpos_world.pose.position.x - tmp_goal.pose.position.x ) * (rpos_world.pose.position.x - tmp_goal.pose.position.x ) +
-//						( rpos_world.pose.position.y - tmp_goal.pose.position.y ) * ( rpos_world.pose.position.y - tmp_goal.pose.position.y ) ;
-//				float fdist = sqrtf( static_cast<float>(fdist_sq) );
-//	//ROS_WARN("fdist from <%f %f> to <%f %f> is  %f  %f\n", start.pose.position.x, start.pose.position.y, tmp_goal.pose.position.x, tmp_goal.pose.position.y, fdist_sq, fdist);
-//				if (fdist > 1.f)
-//					msg_frontierpoints.poses.push_back(tmp_goal);
-//			}
-ROS_WARN(" Aftering inspecting global FR set we have found %d num of valid frontiers \n", msg_frontierpoints.poses.size() );
-		}
-	}
-	else	// found something in the current map
-	{
+ROS_INFO("DNN process has found %d num of frontier points \n",  num_local_frontier_point);
 		for( int idx=0; idx < vo_localfpts_gm.size(); idx++)
 		{
 			if( vo_localfpts_gm[idx].isConfidentFrontierPoint() )
@@ -1508,105 +1729,63 @@ ROS_WARN(" Aftering inspecting global FR set we have found %d num of valid front
 				float fdist = sqrtf( static_cast<float>(fdist_sq) );
 //ROS_INFO("fdist from <%f %f> to <%f %f> is  %f  %f \n", start.pose.position.x, start.pose.position.y, tmp_goal.pose.position.x, tmp_goal.pose.position.y, fdist_sq, fdist);
 				if (fdist > 1.f)
-					msg_frontierpoints.poses.push_back(tmp_goal);
+					vmsg_frontierpoints.push_back(tmp_goal);
 			}
 		}
-ROS_INFO(" We found valid frontier points from DNN %d  out of %d total Fpts found from DNN \n", msg_frontierpoints.poses.size(), vo_localfpts_gm.size() );
+ROS_INFO("Aftering inspecting global FR set we have found %d num of valid frontiers @ mapcallcnt %d \n", vmsg_frontierpoints.size(), mn_mapcallcnt );
+		if( vmsg_frontierpoints.size() == 0 )
+		{
+ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to global fpts \n");
+			bexpand_to_global = true ;
+		}
 	}
-
-	if( msg_frontierpoints.poses.size() == 0 )//&& m_curr_frontier_set.empty() ) // terminating condition
+	else
 	{
-ROS_WARN("No valid frontier found in this round. Let's go over the total fpts set \n");
-
-		for (const auto & pi : m_curr_frontier_set)
-		{
-			geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
-			tmp_goal.header.frame_id = m_worldFrameId ;
-			double fdist_sq = (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) * (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) +
-					( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) * ( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) ;
-			float fdist = sqrtf( static_cast<float>(fdist_sq) );
-			if (fdist > 1.f)
-				msg_frontierpoints.poses.push_back(tmp_goal);
-		}
-
-		if( msg_frontierpoints.poses.size() == 0 )
-		{
-ROS_WARN("Nothing available in the total set buffer \n Finishing up the exploration process \n");
-			mb_explorationisdone = true;
-			return;
-		}
-
-		// delete markers
-//		visualization_msgs::MarkerArray ftmarkers_old = m_frontierpoint_markers ;
-//		for(size_t idx=0; idx < ftmarkers_old.markers.size(); idx++)
-//			ftmarkers_old.markers[idx].action = visualization_msgs::Marker::DELETE; //SetVizMarker( idx, visualization_msgs::Marker::DELETE, 0.f, 0.f, 0.5, "map", 0.f, 1.f, 0.f );
-//		m_markerfrontierPub.publish(ftmarkers_old);
-//		ftmarkers_old = m_unreachable_markers ;
-//		for(size_t idx=0; idx < ftmarkers_old.markers.size(); idx++)
-//			ftmarkers_old.markers[idx].action = visualization_msgs::Marker::DELETE; //SetVizMarker( idx, visualization_msgs::Marker::DELETE, 0.f, 0.f, 0.5, "map", 0.f, 1.f, 0.f );
-//		m_marker_unreachpointPub.publish(ftmarkers_old);
-//		mb_explorationisdone = true;
+		bexpand_to_global = true;
 	}
 
-ROS_INFO(" got valid frontier points \n");
+	if ( bexpand_to_global  )
+	{
+		if( m_curr_frontier_set.size() == 0) //num_global_frontier_point == 0 )
+		{
+			// should terminate the exploration task if no more global fpts is available
+			ROS_ERROR("Neither global nor local frontier points are available. Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
+			mb_explorationisdone = true;
+			return ;
+		}
+		else
+		{
+			for (const auto & pi : m_curr_frontier_set)
+			{
+				geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
+				tmp_goal.header.frame_id = m_worldFrameId ;
+				double fdist_sq = (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) * (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) +
+						( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) * ( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) ;
+				float fdist = sqrtf( static_cast<float>(fdist_sq) );
+				if (fdist > 1.f)
+					vmsg_frontierpoints.push_back(tmp_goal);
+			}
+		}
+	}
+
+//ROS_INFO(" got valid frontier points \n");
+	geometry_msgs::PoseStamped best_goal = vmsg_frontierpoints[0] ;
 
 	// publish goalexclusive fpts
-	int tmpcnt = 0;
-	nav_msgs::Path goalexclusivefpts ;
-	goalexclusivefpts.header.frame_id = m_worldFrameId;
-	goalexclusivefpts.header.seq = m_curr_frontier_set.size() -1 ;
-	goalexclusivefpts.header.stamp = ros::Time::now();
-	for (const auto & pi : m_curr_frontier_set)
-	{
-		if (tmpcnt != 0)
-		{
-			geometry_msgs::PoseStamped fpt = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f ) ;
-			fpt.header.frame_id = m_worldFrameId ;
-			fpt.header.stamp = goalexclusivefpts.header.stamp ;
-			goalexclusivefpts.poses.push_back(fpt);
-		}
-		tmpcnt++;
-	}
+//	nav_msgs::Path goalexclusivefpts ;
+//	goalexclusivefpts.header.frame_id = m_worldFrameId;
+//	goalexclusivefpts.header.seq = m_curr_frontier_set.size() -1 ;
+//	goalexclusivefpts.header.stamp = ros::Time::now();
+//	//for (const auto & pi : m_curr_frontier_set)
+//	for(int idx=1; idx < vmsg_frontierpoints.size(); idx++)
+//	{
+//		geometry_msgs::PoseStamped fpt = msg_frontierpoints.poses[idx]; //StampedPosefromSE2( pi.p[0], pi.p[1], 0.f ) ;
+//		fpt.header.frame_id = m_worldFrameId ;
+//		fpt.header.stamp = goalexclusivefpts.header.stamp ;
+//		goalexclusivefpts.poses.push_back(fpt);
+//	}
 
 // if the best frontier point is the same as the previous frontier point, we need to set a different goal
-
-	geometry_msgs::PoseStamped best_goal = msg_frontierpoints.poses[0] ; //ps.p[0], ps.p[1], 0.f );
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// save best goal shape
-//char tmp00[200], tmp11[200];
-//sprintf(tmp00, "%s/best_goal_cm%05d.txt", m_str_debugpath.c_str(), mn_mapcallcnt) ;
-//sprintf(tmp11, "%s/best_goal_gm%05d.txt", m_str_debugpath.c_str(), mn_mapcallcnt) ;
-//string str_best_goal_cm(tmp00);
-//string str_best_goal_gm(tmp11);
-//
-//ofstream ofs_bestgoal_cm(str_best_goal_cm) ;
-//ofstream ofs_bestgoal_gm(str_best_goal_gm) ;
-//
-//cv::Point frontier_in_gm = world2gridmap( cv::Point2f( best_goal.pose.position.x, best_goal.pose.position.y ) );
-//int px_g = frontier_in_gm.x ;
-//int py_g = frontier_in_gm.y ;
-//int sx = MAX(px_g - mn_roi_size, 0);
-//int ex = MIN(px_g + mn_roi_size, cmwidth) ;
-//int sy = MAX(py_g - mn_roi_size, 0);
-//int ey = MIN(py_g + mn_roi_size, cmheight) ;
-//for( int ridx =sy; ridx < ey; ridx++)
-//{
-//	for( int cidx=sx; cidx < ex; cidx++)
-//	{
-//		int dataidx = ridx * cmwidth + cidx ;
-//		int8_t cost = cmdata[dataidx] ; // 0 ~ 254 --> mapped to 0 ~ 100
-//		int8_t occu = gmdata[dataidx] ;
-//		ofs_bestgoal_cm << (int)cost << " ";
-//		ofs_bestgoal_gm << (int)occu << " ";
-//	}
-//	ofs_bestgoal_cm << endl;
-//	ofs_bestgoal_gm << endl;
-//}
-//ofs_bestgoal_cm.close();
-//ofs_bestgoal_gm.close();
-/////////////////////////////////////////////////////////////////////////////////////////
-
 	// check for ocsillation
 	float fdist2prevposition = euc_dist( cv::Point2f( m_previous_robot_pose.pose.position.x, m_previous_robot_pose.pose.position.y ), cv::Point2f( m_rpos_world.pose.position.x, m_rpos_world.pose.position.y ) ) ;
 	if( fdist2prevposition > 0.5 ) // 0.5 is ros nav stack default
@@ -1638,7 +1817,7 @@ ROS_INFO(" got valid frontier points \n");
 				best_goal.pose.position.x,  best_goal.pose.position.y );
 
 		mb_nbv_selected = true ;
-		if( goalexclusivefpts.poses.size() == 0 )
+		if( vmsg_frontierpoints.size() <= 1 )
 		{
 			ROS_WARN(" However, there is no more frontier points to visit. \n");
 			publishVizMarkers( true );
@@ -1650,9 +1829,9 @@ ROS_INFO(" got valid frontier points \n");
 		appendUnreachablePoint(  ufpt ) ;
 
 		// choose the next best goal based on the eucdist heurisitic.
-ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", goalexclusivefpts.poses.size() );
+ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", vmsg_frontierpoints.size() );
 		geometry_msgs::PoseStamped nextbestpoint = StampedPosefromSE2( 0.f, 0.f, 0.f ) ;
-		selectNextBestPoint( m_rpos_world,  goalexclusivefpts, nextbestpoint) ;
+		selectNextBestPoint( vmsg_frontierpoints, 0, nextbestpoint) ;
 ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n");
 		const std::unique_lock<mutex> lock(mutex_currgoal);
 		m_targetgoal.header.frame_id = m_worldFrameId ;
@@ -1684,6 +1863,63 @@ ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 	m_previous_robot_pose = m_rpos_world;
 	m_currentgoalPub.publish(m_targetgoal);		// for control
+
+
+#ifdef DEBUG_MODE
+// creating logging file for this frame
+char logfile[300];
+sprintf(logfile,"%s/ne_log%04d.txt", m_str_debugpath.c_str(), mn_mapcallcnt);
+m_ofs_logger = ofstream(logfile);
+m_ofs_logger << "cm size " << m_globalcostmap.info.height << " " << m_globalcostmap.info.width << endl;
+m_ofs_logger << " ox oy width height << " << cmstartx << " " << cmstarty << " " << cmwidth << " " << cmheight << endl;
+m_ofs_logger<< "rpos_gm: \n" << m_rpos_gm.x << " " << m_rpos_gm.y << endl;
+m_ofs_logger<< "mn_globalmap_xc_, mn_globalmap_yc_, nox_roi_ds, noy_roi_ds, cnn_width, cnn_height : \n" <<
+		mn_globalmap_xc_ << " " << mn_globalmap_yc_ << " " << nox_roi_ds << " " << noy_roi_ds << " " << mn_cnn_width << " " << mn_cnn_height << endl;
+m_ofs_logger << "global fpts " << endl;
+for(int ii=0; ii < mvo_globalfpts_gm.size(); ii++)
+{
+	m_ofs_logger << mvo_globalfpts_gm[ii].GetInitGridmapPosition().x << " " << mvo_globalfpts_gm[ii].GetInitGridmapPosition().y << " " <<
+			mvo_globalfpts_gm[ii].GetCorrectedGridmapPosition().x << " " << mvo_globalfpts_gm[ii].GetCorrectedGridmapPosition().y << endl;
+}
+m_ofs_logger << endl;
+
+m_ofs_logger << "vfrcents (gm): " << endl;
+for(int ii=0; ii < vfrcents_gm.size(); ii++)
+{
+	m_ofs_logger << vfrcents_gm[ii].x << " " << vfrcents_gm[ii].y << endl ;
+}
+m_ofs_logger << endl;
+
+m_ofs_logger << "local fpts " << endl;
+for(int ii=0; ii < vo_localfpts_gm.size(); ii++)
+{
+	m_ofs_logger << vo_localfpts_gm[ii].GetCorrectedGridmapPosition().x << " " << vo_localfpts_gm[ii].GetCorrectedGridmapPosition().y
+			     << " " << vo_localfpts_gm[ii].mf_ensembled_value << endl;
+}
+m_ofs_logger << endl;
+
+cv::Point optpt_gm  = world2gridmap( cv::Point2f(best_goal.pose.position.x, best_goal.pose.position.y) );
+cv::Point target_gm = world2gridmap( cv::Point2f(m_targetgoal.pose.pose.position.x, m_targetgoal.pose.pose.position.y) );
+m_ofs_logger << endl;
+m_ofs_logger << "optimal/ target frontier fp: next_best_view (" << mb_nbv_selected <<" )" << endl;
+m_ofs_logger << optpt_gm.x << " " << optpt_gm.y << endl;
+m_ofs_logger << target_gm.x << " " << target_gm.y << endl;
+m_ofs_logger.close();
+
+char cgridmapfile[200];
+sprintf(cgridmapfile,"%s/gmap%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strgmapfile(cgridmapfile);
+saveGridmap(strgmapfile, m_gridmap);
+
+char cpotmapfile[200];
+sprintf(cpotmapfile,"%s/potmap%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(string(cpotmapfile), potmap_prediction * 255.f);
+
+char castar_input_file[200];
+sprintf(castar_input_file,"%s/astarinput%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(string(castar_input_file), astar_net_input * 255.f);
+#endif
+
 
 ros::WallTime mapCallEndTime = ros::WallTime::now();
 double mapcallback_time = (mapCallEndTime - mapCallStartTime).toNSec() * 1e-6;
@@ -1760,7 +1996,6 @@ void NeuroExplorer::run_tf_astar_session( const cv::Mat& input_map, cv::Mat& mod
 	int nheight = input_map.rows ;
 	int nwidth  = input_map.cols ;
 	int nchannels = input_map.channels() ;
-	int nclasses = mn_num_classes ;
 
 	memset( mpf_astar_data, 0.f, nheight * nwidth * nchannels * sizeof(float) );
 
@@ -1815,29 +2050,15 @@ mf_total_astar_sessiontime_msec += session_time ;
 
 	void* buff = TF_TensorData(mpptf_astar_output_values[0]);
 	float* offsets = (float*)buff;
-
-	model_output = cv::Mat::zeros(nheight, nwidth, CV_8U);
-
+	model_output = cv::Mat::zeros(nheight, nwidth, CV_32FC1);
 	// C H W style
 	for (int ridx = 0; ridx < nheight; ++ridx)
 	{
 		for (int cidx = 0; cidx < nwidth; ++cidx)
 		{
-			int max_idx = -1;
-			float max_val = -FLT_MAX;
-
-			for(int chidx=0; chidx < nclasses; chidx++)	// hard coded for now...
-			{
-				int idx = ridx * nheight * nclasses + cidx * nclasses + chidx ;
-				float val = offsets[idx] ;
-				if (val > max_val)
-				{
-					max_val = val;
-					max_idx = chidx;
-				}
-				//tmp.at<float>(ridx, cidx) = val ;
-			}
-			model_output.data[ridx*nheight + cidx] = max_idx ;
+			int idx = ridx * nheight + cidx ;
+			float val = offsets[idx] ;
+			model_output.at<float>(ridx, cidx) = val ;
 		}
 	}
 }
@@ -1846,21 +2067,25 @@ void NeuroExplorer::run_tf_covrew_session( const cv::Mat& input_map, cv::Mat& mo
 {
 	int nheight = input_map.rows ;
 	int nwidth  = input_map.cols ;
-	int nclasses = mn_num_classes ;
+	int nchannels = input_map.channels() ;
 
-	ROS_ASSERT(input_map.depth() == CV_8U);
-	memset( mpf_covrew_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+	memset( mpf_covrew_data, 0.f, nheight * nwidth * nchannels * sizeof(float) );
 
     for(int ridx=0; ridx < input_map.rows; ridx++)
     {
     	for(int cidx=0; cidx < input_map.cols; cidx++)
     	{
-    		int lidx = ridx * input_map.cols + cidx ;
-    		mpf_covrew_data[lidx] = static_cast<float>(input_map.data[lidx]) / 255.f   ;
+			float c0 = input_map.at<cv::Vec2f>(ridx, cidx)[0]   ;
+			float c1 = input_map.at<cv::Vec2f>(ridx, cidx)[1]   ;
+			int idx0 = ridx * nheight * nchannels + cidx * nchannels + 0  ;
+			int idx1 = ridx * nheight * nchannels + cidx * nchannels + 1  ;
+			mpf_covrew_data[idx0] = c0 ;
+			mpf_covrew_data[idx1] = c1 ;
     	}
     }
-    const int ndata = sizeof(float)*1*input_map.rows*input_map.cols*1 ;
-    const int64_t dims[] = {1, input_map.rows, input_map.cols, 1};
+
+    const int ndata = sizeof(float) * 1 * nheight * nwidth * nchannels ;
+    const int64_t dims[] = {1, nheight, nwidth, nchannels};
     TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_covrew_data, ndata, &NoOpDeallocator, 0);
     if (int_tensor != NULL)
     {
@@ -1891,30 +2116,92 @@ mf_total_covrew_sessiontime_msec = mf_total_covrew_sessiontime_msec + session_ti
 	void* buff = TF_TensorData(mpptf_covrew_output_values[0]);
 	float* offsets = (float*)buff;
 
-	model_output = cv::Mat::zeros(nheight, nwidth, CV_8U);
-
+	model_output = cv::Mat::zeros(nheight, nwidth, CV_32FC1);
 	// C H W style
 	for (int ridx = 0; ridx < nheight; ++ridx)
 	{
 		for (int cidx = 0; cidx < nwidth; ++cidx)
 		{
-			int max_idx = -1;
-			float max_val = -FLT_MAX;
-
-			for(int chidx=0; chidx < nclasses; chidx++)	// hard coded for now...
-			{
-				int idx = ridx * nheight * nclasses + cidx * nclasses + chidx ;
-				float val = offsets[idx] ;
-				if (val > max_val)
-				{
-					max_val = val;
-					max_idx = chidx;
-				}
-			}
-			model_output.data[ridx*nheight + cidx] = max_idx ;
+			int idx = ridx * nheight + cidx ;
+			float val = offsets[idx] ;
+			model_output.at<float>(ridx, cidx) = val ;
 		}
 	}
 }
+
+//void NeuroExplorer::run_tf_covrew_session( const cv::Mat& input_map, cv::Mat& model_output )
+//{
+//	int nheight = input_map.rows ;
+//	int nwidth  = input_map.cols ;
+//	int nclasses = mn_num_classes ;
+//
+//	ROS_ASSERT(input_map.depth() == CV_8U);
+//	memset( mpf_covrew_data, 0.f, input_map.cols * input_map.rows*sizeof(float) );
+//
+//    for(int ridx=0; ridx < input_map.rows; ridx++)
+//    {
+//    	for(int cidx=0; cidx < input_map.cols; cidx++)
+//    	{
+//    		int lidx = ridx * input_map.cols + cidx ;
+//    		mpf_covrew_data[lidx] = static_cast<float>(input_map.data[lidx]) / 255.f   ;
+//    	}
+//    }
+//    const int ndata = sizeof(float)*1*input_map.rows*input_map.cols*1 ;
+//    const int64_t dims[] = {1, input_map.rows, input_map.cols, 1};
+//    TF_Tensor* int_tensor = TF_NewTensor(TF_FLOAT, dims, 4, mpf_covrew_data, ndata, &NoOpDeallocator, 0);
+//    if (int_tensor != NULL)
+//    {
+//    	//ROS_INFO("TF_NewTensor CovRew is OK\n");
+//    }
+//    else
+//    {
+//    	ROS_ERROR("ERROR: Failed creating CovRew TF_NewTensor\n");
+//    }
+//    mpptf_covrew_input_values[0] = int_tensor;
+//    // //Run the Session
+//
+//ros::WallTime SessionStartTime = ros::WallTime::now();
+//    TF_SessionRun(mptf_covrew_Session, NULL, mptf_covrew_input, mpptf_covrew_input_values, 1, mptf_covrew_output, mpptf_covrew_output_values, 1, NULL, 0, NULL, mptf_covrew_Status);
+//ros::WallTime SessionEndTime = ros::WallTime::now();
+//double session_time = (SessionEndTime - SessionStartTime).toNSec() * 1e-6;
+//mf_total_covrew_sessiontime_msec = mf_total_covrew_sessiontime_msec + session_time ;
+//
+//    if(TF_GetCode(mptf_covrew_Status) == TF_OK)
+//    {
+//    	//ROS_INFO("CovRew session is OK\n");
+//    }
+//    else
+//    {
+//    	ROS_ERROR("%s",TF_Message(mptf_covrew_Status));
+//    }
+//
+//	void* buff = TF_TensorData(mpptf_covrew_output_values[0]);
+//	float* offsets = (float*)buff;
+//
+//	model_output = cv::Mat::zeros(nheight, nwidth, CV_8U);
+//
+//	// C H W style
+//	for (int ridx = 0; ridx < nheight; ++ridx)
+//	{
+//		for (int cidx = 0; cidx < nwidth; ++cidx)
+//		{
+//			int max_idx = -1;
+//			float max_val = -FLT_MAX;
+//
+//			for(int chidx=0; chidx < nclasses; chidx++)	// hard coded for now...
+//			{
+//				int idx = ridx * nheight * nclasses + cidx * nclasses + chidx ;
+//				float val = offsets[idx] ;
+//				if (val > max_val)
+//				{
+//					max_val = val;
+//					max_idx = chidx;
+//				}
+//			}
+//			model_output.data[ridx*nheight + cidx] = max_idx ;
+//		}
+//	}
+//}
 
 int NeuroExplorer::locate_optimal_point_from_potmap( const cv::Mat& input_potmap, const uint8_t& optVal, vector<cv::Point>& points   )
 {
@@ -1961,7 +2248,7 @@ int NeuroExplorer::assign_classes_to_points( const cv::Mat& input_tmap, vector<P
 
 void NeuroExplorer::ensemble_predictions( const cv::Mat& potmap_prediction, const cv::Mat& covrew_prediction, cv::Mat& ensembled_output )
 {
-	cv::addWeighted( potmap_prediction, 0.9, covrew_prediction, 0.1, 0.0, ensembled_output, -1 );
+	cv::addWeighted( potmap_prediction, 1.0, covrew_prediction, 0.0, 0.0, ensembled_output, -1 );
 }
 
 void NeuroExplorer::saveDNNData( const cv::Mat& img_frontiers_offset, const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& best_goal,

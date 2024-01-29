@@ -230,6 +230,7 @@ public:
 
 
 	void saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapData );
+	void writeGridmapToPNG( string filename, const nav_msgs::OccupancyGrid &mapData );
 	void saveFrontierCandidates( string filename, vector<FrontierPoint> voFrontierCandidates );
 
 protected:
@@ -257,7 +258,7 @@ protected:
 	std::string m_mapFrameId;
 	std::string m_baseFrameId ;
 
-	int mn_cols, mn_rows, mn_orig_x_wrt_cent, mn_orig_y_wrt_cent ;
+	int mn_cols, mn_rows, mn_globalmap_xc_, mn_globalmap_yc_ ;
 	//int m_nCannotFindFrontierCount ;
 	bool mb_explorationisdone ;
 
@@ -271,8 +272,9 @@ protected:
 
 	geometry_msgs::PoseWithCovarianceStamped m_targetgoal, m_optimal_targetgoal ; // actual goal /  optimal goal
 	set<pointset> m_unreachable_frontier_set ;
-	set<pointset> m_curr_frontier_set ;
-	set<pointset> m_prev_frontier_set ;
+
+	// curr/prev (global) frontier point set
+	set<pointset> m_curr_frontier_set, m_prev_frontier_set ;
 
 	// thrs
 	//float	m_costmap_conf_thr ;

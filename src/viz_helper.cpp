@@ -29,6 +29,10 @@ mb_explorationisdone(false)
 	m_nh.param("/tf_loader/cnn_width", mn_cnn_width, 512);
 	m_nh.param("/tf_loader/cnn_height", mn_cnn_height, 512);
 
+	mn_scale = pow(2, mn_numpyrdownsample);
+	mn_vizbound_width  = mn_cnn_width  * mn_scale ;
+	mn_vizbound_height = mn_cnn_height * mn_scale ;
+
 	m_vizDataSub  	= m_nh.subscribe("viz_data", 1, &VizHelper::vizCallback, this); // kmHan
 	m_expdoneSub	= m_nh.subscribe("exploration_is_done", 1, &VizHelper::doneCallback, this);
 
@@ -54,6 +58,7 @@ mb_explorationisdone(false)
 	mn_FrontierID = 1;
 	mn_global_FrontierID = 1;
 	mn_UnreachableFptID = 0;
+
 }
 
 VizHelper::~VizHelper()
@@ -146,7 +151,7 @@ void VizHelper::setGlobalFrontierPointMarkers( const geometry_msgs::Point32& tar
 			continue ;
 
 		visualization_msgs::Marker vizmarker = SetVizMarker( mn_global_FrontierID, visualization_msgs::Marker::ADD, fx_g, fy_g, 0.f,
-				m_worldFrameId, 0.f, 1.f, 0.f, 0.5f, (float)FRONTIER_MARKER_SIZE );
+				m_worldFrameId, 0.f, 1.f, 1.f, 0.5f, (float)FRONTIER_MARKER_SIZE );
 		m_global_frontierpoint_markers.markers.push_back(vizmarker);
 		mn_global_FrontierID++ ;
 	}
@@ -211,7 +216,7 @@ void VizHelper::publishUnreachbleMarkers()
 void VizHelper::publishActiveBoundLines( )
 {
 	visualization_msgs::Marker vizbound_lines ;
-	setActiveBound( m_rpos_w.x, m_rpos_w.y, mn_cnn_width, mn_cnn_height, vizbound_lines ) ;
+	setActiveBound( m_rpos_w.x, m_rpos_w.y, mn_vizbound_width, mn_vizbound_height, vizbound_lines ) ;
 	m_active_boundPub.publish( vizbound_lines );
 }
 
@@ -238,12 +243,12 @@ void VizHelper::publishAll()
 	visualization_msgs::Marker vizfr_markers = SetVizMarker( 0, visualization_msgs::Marker::ADD, 0.f, 0.f, 0.f, m_worldFrameId, 1.f, 0.f, 0.f, 1.f, 0.1 );
 	vizfr_markers.type = visualization_msgs::Marker::POINTS;
 
-	setGlobalFrontierRegionMarkers( globalfr_w, vizfr_markers );
+	setGlobalFrontierRegionMarkers( globalfr_w, vizfr_markers ); // cyan  (0,255,255)
 //		setLocalFrontierRegionMarkers(  localfr_w );
 	removeGlobalFrontierPointMarkers() ;
 	setGlobalFrontierPointMarkers(targetgoal_w, global_fpts_w ) ;
 	removeLocalFrontierPointMarkers() ;
-	setLocalFrontierPointMarkers (targetgoal_w, local_fpts_w ) ;
+	setLocalFrontierPointMarkers (targetgoal_w, local_fpts_w ) ; // green (0,255,0)
 	removeUnreachablePointMarkers( );
 	setUnreachbleMarkers( unreachable_fpts_w );
 

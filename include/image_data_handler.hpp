@@ -90,6 +90,7 @@ public:
 	void generate_gaussian_image( const int& nheight, const int& nwidth, const int& kernel_size, const float& sigma  );
 	void obsmap_from_gmap( const cv::Mat& gmap, cv::Mat& obs_map) ;
 	void generate_astar_net_input( const cv::Mat& fr_img_8u, const cv::Mat& gmap_8u, const cv::Mat& gauss_img_32f, cv::Mat& out_map_32f  );
+	void generate_viz_net_input( const cv::Mat& fr_img_8u, const cv::Mat& gmap_8u, cv::Mat& out_map_32f  );
 
 	cv::Mat GetGaussianImg() const {return mcv_gaussimg_32f; };
 

@@ -192,7 +192,7 @@ private:
 
 	int mn_numpyrdownsample;
 	int mn_scale;
-	int mn_roi_size, mn_cnn_height, mn_cnn_width ;
+	int mn_roi_size, mn_cnn_height, mn_cnn_width, mn_vizbound_height, mn_vizbound_width ;
 	int mn_globalmap_width, mn_globalmap_height, mn_globalmap_centx, mn_globalmap_centy ; // global
 	//int mn_activemap_width, mn_activemap_height ;
 	float mf_resolution ;

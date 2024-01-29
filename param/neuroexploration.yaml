@@ -6,8 +6,8 @@ neuroexplorer:
     gridmap_conf_thr:       0.2 # 0.2 (willowgarage)          # the higher the more strict
     occupancy_thr:          50       # 0 ~ 100
     lethal_cost_thr:        90 #10   # 0 ~ 100  uk= -1      # the lower the more strict 
-    global_width:           3096 #2048 
-    global_height:          3096 #2048 
+    global_width:           4096 #2048 
+    global_height:          4096 #2048 
     active_width:           512
     active_height:          512
     num_downsamples:        1 #2  # 1 if global with is 1024, 2 if 2048 
@@ -15,10 +15,10 @@ neuroexplorer:
     unreachable_decision_bound:   0.3 # < 4 * 0.05 res >
     strict_unreachable_decision: true  # make it true if there are several obstacles in the space that blocks the robot to traverse around. true helps if there is frontier point detected beyond the wall (cannot traverse to there). Mostly "true" in real world/ noisy env, but might want to set to "false" in the simulation env where no obs in the space. 
 tf_loader:
-    fd_model_filepath:      '/home/hankm/results/neuro_globalplan_res/fr_detection/base_model' # 8 filter
-    #fd_model_filepath:      '/home/hankm/results/neuro_globalplan_res/fr_detection/model_1'  # 4 filters... finds too many
-    astar_model_filepath:   '/home/hankm/results/neuro_globalplan_res/pathlen_estimator/base_model'
-    covrew_model_filepath:  '/home/hankm/results/neuro_globalplan_res/coverage_estimator/base_model'
+    fd_model_filepath:      '/home/hankm/catkin_ws/src/neuro_explorer/nn_models/fr_net/base_model' # 8 filter
+    astar_model_filepath:   '/home/hankm/catkin_ws/src/neuro_explorer/nn_models/astar_net/base_model'
+    covrew_model_filepath:  '/home/hankm/catkin_ws/src/neuro_explorer/nn_models/viz_net/base_model'
+    #covrew_model_filepath:  '/home/hankm/results/neuro_globalplan_res/coverage_estimator/base_model'
     cnn_height:             512
     cnn_width:              512
     num_classes:            8

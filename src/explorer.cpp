@@ -48,7 +48,7 @@ Explorer::Explorer():
 m_worldFrameId("map"), m_baseFrameId("base_footprint"),
 mu_cmheight(0), mu_cmwidth(0), me_robotstate(ROBOT_STATE::ROBOT_IS_NOT_MOVING),
 m_move_client("move_base", true),
-mf_robot_radius(0.3), mb_explorationisdone(false), mn_orig_x_wrt_cent(0), mn_orig_y_wrt_cent(0), mn_rows(0), mn_cols(0)
+mf_robot_radius(0.3), mb_explorationisdone(false), mn_globalmap_xc_(0), mn_globalmap_yc_(0), mn_rows(0), mn_cols(0)
 {
 
 }
@@ -281,7 +281,7 @@ void Explorer::saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapD
 	float resolution = mapData.info.resolution ;
 
 	std::vector<signed char> Data=mapData.data;
-	ofs_map << width << " " << height << " " << origx << " " << origy << " " << resolution;
+	//ofs_map << width << " " << height << " " << origx << " " << origy << " " << resolution;
 	for(int ridx = 0; ridx < height; ridx++)
 	{
 		for(int cidx = 0; cidx < width; cidx++)
@@ -289,8 +289,32 @@ void Explorer::saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapD
 			int value = static_cast<int>( Data[ridx * width + cidx] ) ;
 			ofs_map << value << " ";
 		}
+		ofs_map << "\n";
 	}
 	ofs_map.close();
+}
+
+void Explorer::writeGridmapToPNG( string filename, const nav_msgs::OccupancyGrid &mapData )
+{
+//	ofstream ofs_map(filename) ;
+//	int height = mapData.info.height ;
+//	int width  = mapData.info.width ;
+//	float origx = mapData.info.origin.position.x ;
+//	float origy = mapData.info.origin.position.y ;
+//	float resolution = mapData.info.resolution ;
+//
+//	std::vector<signed char> Data=mapData.data;
+//	//ofs_map << width << " " << height << " " << origx << " " << origy << " " << resolution;
+//	for(int ridx = 0; ridx < height; ridx++)
+//	{
+//		for(int cidx = 0; cidx < width; cidx++)
+//		{
+//			int value = static_cast<int>( Data[ridx * width + cidx] ) ;
+//			ofs_map << value << " ";
+//		}
+//		ofs_map << "\n";
+//	}
+//	ofs_map.close();
 }
 
 void Explorer::saveFrontierCandidates( string filename, vector<FrontierPoint> voFrontierCandidates )

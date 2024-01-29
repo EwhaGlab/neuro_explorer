@@ -159,9 +159,24 @@ void ImageDataHandler::generate_astar_net_input( const cv::Mat& fr_img_8u, const
 	out_map_chs.push_back(gauss_img_32f);
 
 	cv::merge(out_map_chs, out_map_32f);
-
 }
 
+void ImageDataHandler::generate_viz_net_input( const cv::Mat& fr_img_8u, const cv::Mat& gmap_8u, cv::Mat& out_map_32f  )
+{
+	int nheight = fr_img_8u.rows ;
+	int nwidth  = fr_img_8u.cols ;
+	cv::Mat fr_map_32f = cv::Mat::zeros(nheight, nwidth, CV_32F );
+	cv::Mat gmap_32f = cv::Mat::zeros(nheight, nwidth, CV_32F );
+	out_map_32f = cv::Mat::zeros(nheight, nwidth, CV_32FC2 );
+
+	fr_img_8u.convertTo(fr_map_32f, CV_32F, 1.f/255.f);
+	gmap_8u.convertTo(gmap_32f, CV_32F, 1.f/255.f);
+
+	vector<cv::Mat> out_map_chs;
+	out_map_chs.push_back(gmap_32f);
+	out_map_chs.push_back(fr_map_32f);
+	cv::merge(out_map_chs, out_map_32f);
+}
 
 
 }

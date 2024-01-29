@@ -126,6 +126,7 @@ private:
 
 enum PointState{ NOT_TESTED = 0, GM_TESTED, CM_FILTERED, FULL_TESTED };
 
+
 class FrontierPoint
 {
 public:
@@ -241,6 +242,15 @@ public:
 		ofs.close();
 	}
 
+//	bool operator< (const FrontierPoint& other) const
+//	{
+//		return mf_pot_value > other.mf_pot_value ;
+//	}
+
+	float mf_vizvalue ;
+	float mf_potvalue ; // value of the point in terms of (Astar Pot or Ensembled score )
+	float mf_ensembled_value ;
+
 private:
 
 	//bool m_bcostmap_consent, m_bgridmap_consent;
@@ -271,6 +281,30 @@ private:
 	float mf_res ;
 	int m_nNumPyrDownSample ;
 	int m_nScale ;
+};
+
+struct sort_by_potvalue
+{
+	inline bool operator() ( const FrontierPoint& fpt1, const FrontierPoint& fpt2 )
+	{
+		return ( fpt1.mf_potvalue > fpt2.mf_potvalue ) ;
+	}
+};
+
+struct sort_by_vizvalue
+{
+	inline bool operator() ( const FrontierPoint& fpt1, const FrontierPoint& fpt2 )
+	{
+		return ( fpt1.mf_vizvalue > fpt2.mf_vizvalue ) ;
+	}
+};
+
+struct sort_by_ensembled_value
+{
+	inline bool operator() ( const FrontierPoint& fpt1, const FrontierPoint& fpt2 )
+	{
+		return ( fpt1.mf_ensembled_value > fpt2.mf_ensembled_value ) ;
+	}
 };
 
 }

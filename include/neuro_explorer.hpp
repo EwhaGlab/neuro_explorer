@@ -65,7 +65,7 @@ EMail:       kimy@ewha.ac.kr
 #include "neuro_explorer/VizDataStamped.h"
 
 #define DIST_HIGH  (1.0e10)
-
+#define DEBUG_MODE
 
 namespace neuroexplorer
 {
@@ -102,7 +102,9 @@ public:
 
 	void initGlobalmapimgs(  const int& cmheight, const int& cmwidth, const nav_msgs::OccupancyGrid& globalcostmap  );
 	void copyFRtoGlobalmapimg(  const cv::Rect& roi_active_ds, const cv::Mat& fr_img );
-	int  locateFRnFptsFromFRimg( const cv::Mat& cvFRimg, const int& nxoffset, const int& nyoffset, vector<vector<cv::Point>>& contours_gm, vector<FrontierPoint>& fpts_gm_ds ) ;
+	int  locateGlobalFRnFptsFromGlobalFRimg( const cv::Mat& FR_in_glob, const cv::Point& rpos_gmds, const cv::Point& am_orig_ds, vector<vector<cv::Point>>& contours_gm, vector<FrontierPoint>& fpts_gm ) ;
+	int  locateFptsFromPredimg( const cv::Mat& potmap_prediction, const cv::Mat& covrew_predection, const vector<cv::Point>& FRcents_gm, const cv::Point& rpos_gmds, const cv::Point& amds_roi_orig,  vector<FrontierPoint>& fpts_gm ) ;
+	int locateFRfromFRimg( const cv::Mat& cvFRimg, const cv::Point& rpos_gmds, const cv::Point& am_orig_ds, vector<vector<cv::Point>>& contours_gm, vector<cv::Point>& FRcents_gm );
 	void globalCostmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
 	void gridmapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg ) ;
 	void globalCostmapUpdateCallback(const map_msgs::OccupancyGridUpdate::ConstPtr& msg );
@@ -137,7 +139,9 @@ public:
 
 	void updateUnreachablePointSet(  const nav_msgs::OccupancyGrid& globalcostmap  ) ;
 
-	int selectNextBestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  ) ;
+	int selectNextClosestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  ) ;
+	int selectNextBestPoint( const vector<geometry_msgs::PoseStamped>& vmsg_frontierpoints, int nbestidx, geometry_msgs::PoseStamped& nextbestpoint  ) ;
+
 	int selectEscapingPoint( geometry_msgs::PoseStamped& escapepoint) ;
 	int moveBackWard() ;
 
@@ -287,6 +291,33 @@ public:
     	nmy = ngmy / nscale ;
     }
 
+    inline cv::Point gridmapDS_to_activemap( const cv::Point& pt_gmds, const cv::Point& rpos_gmds )
+    {
+    	int nx_am = ( pt_gmds.x - rpos_gmds.x ) + mn_cnn_width / 2;
+    	int ny_am = ( pt_gmds.y - rpos_gmds.y ) + mn_cnn_height/ 2;
+    	return cv::Point(nx_am, ny_am);
+    }
+
+    inline cv::Point activemap_to_gridmapDS( const cv::Point& pt_am, const cv::Point& rpos_gmds )
+    {
+    	int nx_gmds = ( pt_am.x - mn_cnn_width / 2) + rpos_gmds.x ;
+    	int ny_gmds = ( pt_am.y - mn_cnn_height/ 2) + rpos_gmds.y ;
+    	return cv::Point(nx_gmds, ny_gmds) ;
+    }
+
+    inline cv::Point gridmapDS_to_globalmapDS( const cv::Point& pt_gmds, const cv::Point& rpos_gmds, const cv::Point& am_roi_orig )
+    {
+    	cv::Point pt_am = gridmapDS_to_activemap( pt_gmds, rpos_gmds );
+    	return cv::Point( pt_am.x + am_roi_orig.x, pt_am.y + am_roi_orig.y ) ;
+    }
+
+    cv::Point globalmapDS_to_gridmapDS( const cv::Point& pt_glob_ds, const cv::Point& rpos_gmds, const cv::Point& am_roi_orig )
+    {
+    	cv::Point pt_am = cv::Point( pt_glob_ds.x - am_roi_orig.x, pt_glob_ds.y - am_roi_orig.y );
+    	cv::Point pt_gmds = activemap_to_gridmapDS( pt_am, rpos_gmds );
+    	return pt_gmds ;
+    }
+
     static float euc_dist(const cv::Point2f& lhs, const cv::Point2f& rhs)
     {
         return (float)sqrt(  (lhs.x - rhs.x) * (lhs.x - rhs.x) + (lhs.y - rhs.y) * (lhs.y - rhs.y)  );
@@ -400,6 +431,9 @@ protected:
     int mn_num_classes ;
     geometry_msgs::PoseStamped m_rpos_world ;
 
+// gridmap, activmap, globalmap tforms....
+    cv::Point m_rpos_gm ;
+    cv::Rect m_roi_active_ds ;
 
 private:
 	std::mutex mutex_robot_state;
@@ -417,6 +451,7 @@ private:
 	ImageDataHandler m_data_handler;
 
 	// for debug
+	ofstream m_ofs_logger ;
 	ofstream m_ofs_ae_report ;
 	string mstr_report_filename ;
 	int mn_mapcallcnt, mn_mapdatacnt, mn_moverobotcnt ;
