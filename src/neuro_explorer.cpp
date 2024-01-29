@@ -164,8 +164,8 @@ ROS_INFO("global map size (%d %d) and dnn input size (%d %d): \n", mn_globalmap_
 // load init robot pose
 	m_init_robot_pose = GetCurrRobotPose();
 
-	m_prev_frontier_set = set<pointset>();
-	m_curr_frontier_set = set<pointset>();
+	m_prev_acc_frontierset = set<pointset>();
+	m_curr_acc_frontierset = set<pointset>();
 	//m_exploration_goal = SetVizMarker( m_worldFrameId, 1.f, 0.f, 1.f, 0.5  );
 
 	ROS_INFO("neuroexplorer has initialized with (%d) downsmapling map \n", mn_numpyrdownsample);
@@ -605,7 +605,7 @@ void NeuroExplorer::publishVizMarkers( bool bviz_flag )
 		// global fpts
 		{
 			const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
-			for(const auto & pi : m_curr_frontier_set )
+			for(const auto & pi : m_curr_acc_frontierset )
 			{
 				fpt.x = pi.p[0] ;
 				fpt.y = pi.p[1] ;
@@ -672,10 +672,10 @@ void NeuroExplorer::updatePrevFrontierPointsList( )
 		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
 		const std::unique_lock<mutex> lock_prev(mutex_prev_frontier_set);
 		set<pointset> frontier_set_tmp ;
-		frontier_set_tmp = m_curr_frontier_set ;
-		m_prev_frontier_set.clear() ;
-		m_curr_frontier_set.clear() ;
-		m_prev_frontier_set = frontier_set_tmp;
+		frontier_set_tmp = m_curr_acc_frontierset ;
+		m_prev_acc_frontierset.clear() ;
+		m_curr_acc_frontierset.clear() ;
+		m_prev_acc_frontierset = frontier_set_tmp;
 	}
 }
 
@@ -750,7 +750,7 @@ int  NeuroExplorer::locateGlobalFRnFptsFromGlobalFRimg( const cv::Mat& FR_in_glo
 		ROS_WARN("There is no opt FR region in the input map img\n");
 		return 0;
 	}
-	else // We found opt fr in the current map. We append the new opt points to m_curr_frontier_set accordingly
+	else // We found opt fr in the current map. We append the new opt points to m_curr_acc_frontierset accordingly
 	{
 		geometry_msgs::Point point_w;
 		vector<cv::Point> vecents_glob_ds;  // shifted by the offet param
@@ -1009,7 +1009,7 @@ int NeuroExplorer::locateFRfromFRimg( const cv::Mat& FR_in_am, const cv::Point& 
 		ROS_WARN("There is no opt FR region in the input map img\n");
 		return 0;
 	}
-	else // We found opt fr in the current map. We append the new opt points to m_curr_frontier_set accordingly
+	else // We found opt fr in the current map. We append the new opt points to m_curr_acc_frontierset accordingly
 	{
 		geometry_msgs::Point point_w;
 		vector<cv::Point> vecents_gm;  // shifted by the offet param
@@ -1257,7 +1257,7 @@ int NeuroExplorer::frontier_summary( const vector<FrontierPoint>& voFrontierCurr
 	}
 
 	ROS_INFO("\n\n Tot cumulated frontier points to process: \n\n");
-	for (const auto & di : m_curr_frontier_set )
+	for (const auto & di : m_curr_acc_frontierset )
 	{
 			ROS_INFO("cumulated pts: (%f %f) \n", di.p[0], di.p[1]);
 	}
@@ -1615,7 +1615,7 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
 		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set);
 		// append valid previous frontier points after the sanity check
-		for (const auto & pi : m_prev_frontier_set)
+		for (const auto & pi : m_prev_acc_frontierset)
 		{
 //ROS_INFO("checking reachability %f %f \n", pi.p[0], pi.p[1] );
 			int ngmx = static_cast<int>( (pi.p[0] - globalcostmap.info.origin.position.x) / cmresolution ) ;
@@ -1625,7 +1625,7 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 				if( mo_frontierfilter.isReachable( m_unreachable_frontier_set, pi.p[0], pi.p[1] ) )
 				{
 					pointset pnew( pi.p[0], pi.p[1] );
-					m_curr_frontier_set.insert( pnew );
+					m_curr_acc_frontierset.insert( pnew );
 				}
 			}
 		}
@@ -1678,7 +1678,7 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 //			{
 //				cv::Point2f frontier_in_world = vo_globalfpts_gm[idx].GetCorrectedWorldPosition() ;
 //				pointset pt( frontier_in_world.x, frontier_in_world.y );
-//				m_curr_frontier_set.insert( pt );
+//				m_curr_acc_frontierset.insert( pt );
 //			}
 //		}
 		const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
@@ -1688,15 +1688,15 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 			{
 				cv::Point2f frontier_in_world = vo_localfpts_gm[idx].GetCorrectedWorldPosition() ;
 				pointset pt( frontier_in_world.x, frontier_in_world.y );
-				m_curr_frontier_set.insert( pt );
+				m_curr_acc_frontierset.insert( pt );
 			}
 		}
 	}
 
 ROS_INFO("num local fr cents : %d  \n", num_localFRs ) ;
-ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_frontier_set.size(), num_local_frontier_point ) ;
+ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size(), num_local_frontier_point ) ;
 
-	if( num_local_frontier_point == 0 && m_curr_frontier_set.empty() )
+	if( num_local_frontier_point == 0 && m_curr_acc_frontierset.empty() )
 	{
 		ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
 		mb_explorationisdone = true;
@@ -1746,7 +1746,7 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 
 	if ( bexpand_to_global  )
 	{
-		if( m_curr_frontier_set.size() == 0) //num_global_frontier_point == 0 )
+		if( m_curr_acc_frontierset.size() == 0) //num_global_frontier_point == 0 )
 		{
 			// should terminate the exploration task if no more global fpts is available
 			ROS_ERROR("Neither global nor local frontier points are available. Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
@@ -1755,7 +1755,7 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 		}
 		else
 		{
-			for (const auto & pi : m_curr_frontier_set)
+			for (const auto & pi : m_curr_acc_frontierset)
 			{
 				geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
 				tmp_goal.header.frame_id = m_worldFrameId ;
@@ -1774,9 +1774,9 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 	// publish goalexclusive fpts
 //	nav_msgs::Path goalexclusivefpts ;
 //	goalexclusivefpts.header.frame_id = m_worldFrameId;
-//	goalexclusivefpts.header.seq = m_curr_frontier_set.size() -1 ;
+//	goalexclusivefpts.header.seq = m_curr_acc_frontierset.size() -1 ;
 //	goalexclusivefpts.header.stamp = ros::Time::now();
-//	//for (const auto & pi : m_curr_frontier_set)
+//	//for (const auto & pi : m_curr_acc_frontierset)
 //	for(int idx=1; idx < vmsg_frontierpoints.size(); idx++)
 //	{
 //		geometry_msgs::PoseStamped fpt = msg_frontierpoints.poses[idx]; //StampedPosefromSE2( pi.p[0], pi.p[1], 0.f ) ;
@@ -1806,7 +1806,7 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 		publishVizMarkers( true );
 		updatePrevFrontierPointsList( ) ;
 
-		// update m_prev_frontier_set / m_curr_frontier_set list
+		// update m_prev_acc_frontierset / m_curr_acc_frontierset list
 		mb_strict_unreachable_decision = true;
 		m_last_oscillation_reset = ros::Time::now();
 		return ;

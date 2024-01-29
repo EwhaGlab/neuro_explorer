@@ -273,8 +273,8 @@ protected:
 	geometry_msgs::PoseWithCovarianceStamped m_targetgoal, m_optimal_targetgoal ; // actual goal /  optimal goal
 	set<pointset> m_unreachable_frontier_set ;
 
-	// curr/prev (global) frontier point set
-	set<pointset> m_curr_frontier_set, m_prev_frontier_set ;
+	// curr/prev (global, accumulated) frontier point set
+	set<pointset> m_curr_acc_frontierset, m_prev_acc_frontierset ;
 
 	// thrs
 	//float	m_costmap_conf_thr ;
