@@ -83,6 +83,8 @@ mn_num_classes(8)
 	m_nh.param("/neuroexplorer/frame_id", m_worldFrameId, std::string("map"));
 	m_nh.param("/neuroexplorer/strict_unreachable_decision", mb_strict_unreachable_decision, true);
 	m_nh.param("/neuroexplorer/allow_unknown", mb_allow_unknown, true);
+	m_nh.param("/neuroexplorer/lambda", mf_lambda, 0.5f);
+
 	m_nh.param("/move_base/global_costmap/resolution", mf_resolution, 0.05f) ;
 	m_nh.param("/move_base/global_costmap/robot_radius", mf_robot_radius, 0.12); // 0.3 for fetch
 
@@ -926,7 +928,7 @@ int NeuroExplorer::locateFptsFromPredimg( const cv::Mat& potmap_prediction, cons
 
 		oPoint_gm.mf_potvalue = potmap_prediction.at<float>( corrected_pt_am.y, corrected_pt_am.x );
 		oPoint_gm.mf_vizvalue = covrew_prediction.at<float>( corrected_pt_am.y, corrected_pt_am.x );
-		oPoint_gm.mf_ensembled_value = 0.5 * oPoint_gm.mf_potvalue + 0.5 * oPoint_gm.mf_vizvalue ;
+		oPoint_gm.mf_ensembled_value = mf_lambda * oPoint_gm.mf_potvalue + (1-mf_lambda) * oPoint_gm.mf_vizvalue ;
 		oPoint_gm.SetCorrectedCoordinate(corrected_pt);
 		fpts_gm.push_back(oPoint_gm);
 	}
@@ -1589,9 +1591,9 @@ double covrew_time = (CRendTime - CRstartTime ).toNSec() * 1e-6;
 	ensemble_predictions(potmap_prediction, covrew_prediction, ensembled_prediction);
 	//cv::Mat ensembled_prediction = potmap_prediction ; // continous 0 ~ 1
 
-char tmppred[200];
-sprintf(tmppred,"%s/ensembled_prediction%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
-cv::imwrite(tmppred, ensembled_prediction * 255.f );
+//char tmppred[200];
+//sprintf(tmppred,"%s/ensembled_prediction%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+//cv::imwrite(tmppred, ensembled_prediction * 255.f );
 	double covrew_minVal, covrew_maxVal;
 	cv::minMaxLoc( covrew_prediction, &covrew_minVal, &covrew_maxVal );
 	int ncovrew_maxVal = static_cast<int>(covrew_maxVal);

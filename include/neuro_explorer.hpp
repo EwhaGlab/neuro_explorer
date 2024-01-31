@@ -65,7 +65,7 @@ EMail:       kimy@ewha.ac.kr
 #include "neuro_explorer/VizDataStamped.h"
 
 #define DIST_HIGH  (1.0e10)
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 namespace neuroexplorer
 {
@@ -450,10 +450,14 @@ private:
 	omp_lock_t m_mplock;
 	ImageDataHandler m_data_handler;
 
+	// weighted sum coefficients used for ensembling.
+	float mf_lambda ;
+
 	// for debug
 	ofstream m_ofs_logger ;
 	ofstream m_ofs_ae_report ;
 	string mstr_report_filename ;
+
 	int mn_mapcallcnt, mn_mapdatacnt, mn_moverobotcnt ;
 	double mf_avgcallbacktime_msec, mf_totalcallbacktime_msec ;
 
