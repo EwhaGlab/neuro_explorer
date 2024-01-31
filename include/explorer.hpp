@@ -226,12 +226,14 @@ public:
 
 	inline bool isDone() const { return mb_explorationisdone; }
 
+	void saveMetaData(const string& metadatafilename, const nav_msgs::MapMetaData& mapInfo, const geometry_msgs::PoseWithCovarianceStamped& rpos_w );
+	void saveRobotPose(const string& rposefilename, const geometry_msgs::PoseWithCovarianceStamped& rpos_w );
+	void saveGridmap( const string& mapfilename, const string& mapinfofilename, const nav_msgs::OccupancyGrid& mapData );
+	void saveGridmap( const string& mapfilename, const nav_msgs::OccupancyGrid& mapData );
+	void saveCostmap( const string& mapfilename, const nav_msgs::OccupancyGrid& mapData );
 
-
-
-	void saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapData );
-	void writeGridmapToPNG( string filename, const nav_msgs::OccupancyGrid &mapData );
-	void saveFrontierCandidates( string filename, vector<FrontierPoint> voFrontierCandidates );
+	void writeGridmapToPNG( const string& filename, const nav_msgs::OccupancyGrid &mapData );
+	void saveFrontierCandidates( const string& filename, const vector<FrontierPoint>& voFrontierCandidates );
 
 protected:
 

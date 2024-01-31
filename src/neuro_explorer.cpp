@@ -1922,6 +1922,37 @@ sprintf(castar_input_file,"%s/astarinput%04d.png",m_str_debugpath.c_str(), mn_ma
 cv::imwrite(string(castar_input_file), astar_net_input * 255.f);
 #endif
 
+// saving data
+#ifdef DATA_COLLECTION_MODE
+
+// save gridmap
+char cgridmapfile[200], cgridmapinfofile[200];
+sprintf(cgridmapfile,"%s/gmap%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strgmapfile(cgridmapfile);
+sprintf(cgridmapinfofile,"%s/gmap_info%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strgmapinfofile(cgridmapinfofile);
+saveGridmap(strgmapfile, strgmapinfofile, m_gridmap);
+
+// save costmap
+char ccostmapfile[200], ccostmapinfofile[200];
+sprintf(ccostmapfile,"%s/cmap%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strcmapfile(ccostmapfile);
+saveGridmap(strcmapfile, m_globalcostmap);
+
+// save robotpose
+char crposefile[200];
+sprintf(crposefile,"%s/rpose%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strrposefile(crposefile);
+saveRobotPose(strrposefile, m_robotpose );
+
+// save local frontier points (found by CNN)
+char cfptsfile[200];
+sprintf(cfptsfile,"%s/localfpts_gm%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strfptsfile(cfptsfile);
+saveFrontierCandidates( strfptsfile, vo_localfpts_gm );
+
+#endif
+
 
 ros::WallTime mapCallEndTime = ros::WallTime::now();
 double mapcallback_time = (mapCallEndTime - mapCallStartTime).toNSec() * 1e-6;

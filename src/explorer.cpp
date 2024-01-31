@@ -271,9 +271,51 @@ bool Explorer::correctFrontierPosition( const nav_msgs::OccupancyGrid &gridmap, 
 
 //void accessFrontierPoint( ){}
 
-void Explorer::saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapData )
+void Explorer::saveMetaData(const string& metadatafilename, const nav_msgs::MapMetaData& mapInfo, const geometry_msgs::PoseWithCovarianceStamped& rpos_w )
 {
-	ofstream ofs_map(filename) ;
+	ofstream ofs_metadata(metadatafilename) ;
+	ofs_metadata << rpos_w.pose.pose.position.x << " " << rpos_w.pose.pose.position.y << " "
+				 << mapInfo.height << " " << mapInfo.width << " " << mapInfo.origin.position.x << " " << mapInfo.origin.position.y << mapInfo.resolution << endl;
+	ofs_metadata.close();
+}
+
+void Explorer::saveRobotPose(const string& rposefilename, const geometry_msgs::PoseWithCovarianceStamped& rpos_w )
+{
+	ofstream ofs_rpose(rposefilename) ;
+	ofs_rpose << rpos_w.pose.pose.position.x << " " << rpos_w.pose.pose.position.y << endl;
+	ofs_rpose.close();
+}
+
+void Explorer::saveGridmap( const string& mapfilename, const string& mapinfofilename, const nav_msgs::OccupancyGrid& mapData )
+{
+	ofstream ofs_map(mapfilename) ;
+	ofstream ofs_info(mapinfofilename);
+
+	int height = mapData.info.height ;
+	int width  = mapData.info.width ;
+	float origx = mapData.info.origin.position.x ;
+	float origy = mapData.info.origin.position.y ;
+	float resolution = mapData.info.resolution ;
+
+	std::vector<signed char> Data=mapData.data;
+	ofs_info << origx << " " << origy << " " << width << " " << height << " " << resolution << endl;;
+	ofs_info.close();
+
+	for(int ridx = 0; ridx < height; ridx++)
+	{
+		for(int cidx = 0; cidx < width; cidx++)
+		{
+			int value = static_cast<int>( Data[ridx * width + cidx] ) ;
+			ofs_map << value << " ";
+		}
+		ofs_map << "\n";
+	}
+	ofs_map.close();
+}
+
+void Explorer::saveGridmap( const string& mapfilename, const nav_msgs::OccupancyGrid& mapData )
+{
+	ofstream ofs_map(mapfilename) ;
 	int height = mapData.info.height ;
 	int width  = mapData.info.width ;
 	float origx = mapData.info.origin.position.x ;
@@ -294,7 +336,7 @@ void Explorer::saveGridmap( string filename, const nav_msgs::OccupancyGrid &mapD
 	ofs_map.close();
 }
 
-void Explorer::writeGridmapToPNG( string filename, const nav_msgs::OccupancyGrid &mapData )
+void Explorer::writeGridmapToPNG( const string& filename, const nav_msgs::OccupancyGrid &mapData )
 {
 //	ofstream ofs_map(filename) ;
 //	int height = mapData.info.height ;
@@ -317,7 +359,7 @@ void Explorer::writeGridmapToPNG( string filename, const nav_msgs::OccupancyGrid
 //	ofs_map.close();
 }
 
-void Explorer::saveFrontierCandidates( string filename, vector<FrontierPoint> voFrontierCandidates )
+void Explorer::saveFrontierCandidates( const string& filename, const vector<FrontierPoint>& voFrontierCandidates )
 {
 	ofstream ofs_fpts(filename) ;
 	for(size_t idx=0; idx < voFrontierCandidates.size(); idx++)

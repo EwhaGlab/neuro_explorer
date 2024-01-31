@@ -66,6 +66,7 @@ EMail:       kimy@ewha.ac.kr
 
 #define DIST_HIGH  (1.0e10)
 //#define DEBUG_MODE
+#define DATA_COLLECTION_MODE // data collection (gmap, rpos, frontier points) // this dataset is useful for timing experiment btwn FR-Net, A*-Net vs. DFFP, single-thread-A* planner
 
 namespace neuroexplorer
 {
