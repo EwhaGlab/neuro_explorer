@@ -66,7 +66,8 @@ EMail:       kimy@ewha.ac.kr
 
 #define DIST_HIGH  (1.0e10)
 //#define DEBUG_MODE
-#define DATA_COLLECTION_MODE // data collection (gmap, rpos, frontier points) // this dataset is useful for timing experiment btwn FR-Net, A*-Net vs. DFFP, single-thread-A* planner
+//#define DATA_COLLECTION_MODE // data collection (gmap, rpos, frontier points) // this dataset is useful for timing experiment btwn FR-Net, A*-Net vs. DFFP, single-thread-A* planner
+//#define SAVE_DNN_OUTPUTS
 
 namespace neuroexplorer
 {
@@ -140,7 +141,8 @@ public:
 
 	void updateUnreachablePointSet(  const nav_msgs::OccupancyGrid& globalcostmap  ) ;
 
-	int selectNextClosestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  ) ;
+	int sort_by_distance_to_robot( const geometry_msgs::PoseStamped& robotpose, vector<geometry_msgs::PoseStamped>& frontierpoints );
+	int selectNextClosestPoint( const geometry_msgs::PoseStamped& robotpose, const vector<geometry_msgs::PoseStamped>& vmsg_frontierpoints, geometry_msgs::PoseStamped& nextbestpoint  ) ;
 	int selectNextBestPoint( const vector<geometry_msgs::PoseStamped>& vmsg_frontierpoints, int nbestidx, geometry_msgs::PoseStamped& nextbestpoint  ) ;
 
 	int selectEscapingPoint( geometry_msgs::PoseStamped& escapepoint) ;
@@ -322,6 +324,11 @@ public:
     static float euc_dist(const cv::Point2f& lhs, const cv::Point2f& rhs)
     {
         return (float)sqrt(  (lhs.x - rhs.x) * (lhs.x - rhs.x) + (lhs.y - rhs.y) * (lhs.y - rhs.y)  );
+    }
+
+    static float euc_dist(const geometry_msgs::PoseStamped& lhs, const geometry_msgs::PoseStamped& rhs)
+    {
+        return (float)sqrt(  (lhs.pose.position.x - rhs.pose.position.x) * (lhs.pose.position.x - rhs.pose.position.x) + (lhs.pose.position.y - rhs.pose.position.y) * (lhs.pose.position.y - rhs.pose.position.y)  );
     }
 
 // tensorflow apis

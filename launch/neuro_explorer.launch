@@ -15,7 +15,7 @@
     <!--param name="slam_method" value="$(arg slam_method)"/-->
     <param name="numthreads" value="$(arg numthreads)"/>
     
-    <arg name="rviz_config" value ="$(find neuro_explorer)/launch/includes/rviz_config/neuro_explorer_wg.rviz"/>
+    <arg name="rviz_config" value ="$(find neuro_explorer)/launch/includes/rviz_config/neuro_explorer_wgx3.rviz"/>
     <rosparam command="load" file="$(find neuro_explorer)/param/neuroexploration.yaml"/>
     
     <!--include file="$(find neuro_explorer)/launch/includes/explore_bench-corridor.launch"/-->
@@ -27,7 +27,7 @@
     </node-->
     <node pkg="neuro_explorer" type="viz_helper_node" name="viz_helper" output="screen"/>
 
-    <node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/>    
+    <!--node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/-->    
 
     <!-- bag -->
     <!--node pkg="rosbag" type="record" name="rosbag_record" args="record -a -o /media/data/results/explore_bench/bag/"/-->

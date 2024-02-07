@@ -60,6 +60,11 @@ EMail:       kimy@ewha.ac.kr
 #include <ros/console.h>
 #include <cv_bridge/cv_bridge.h>
 
+// map saver
+#include "map_server/image_loader.h"
+#include "nav_msgs/MapMetaData.h"
+#include "yaml-cpp/yaml.h"
+
 #include "nav_msgs/OccupancyGrid.h"
 #include "map_msgs/OccupancyGridUpdate.h"
 #include "geometry_msgs/PointStamped.h"
@@ -80,14 +85,12 @@ EMail:       kimy@ewha.ac.kr
 #include <actionlib/client/action_client.h>
 
 #include <tf/transform_listener.h>
-
 #include "ros/service_client.h"
 #include "nav_msgs/GetPlan.h"
 
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include <experimental/filesystem>
 #include <set>
-
 #include "frontier_point.hpp"
 
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> SimpleMoveBaseClient ;
@@ -239,6 +242,7 @@ protected:
 
 	string m_str_debugpath ;
 	string m_str_inputparams ;
+	bool mb_savemap ;
 	cv::FileStorage m_fs;
 
 	int mn_numpyrdownsample;

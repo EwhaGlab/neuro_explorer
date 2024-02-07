@@ -2,12 +2,13 @@
 neuroexplorer:
     debug_data_save_path:   '/home/hankm/results/neuro_exploration_res'
     ne_report_file:         'ne_report.txt'
-    costmap_conf_thr:       0.5 # 0.4 (works for willowgarage) # 0.4 (fetch)   # the higher the more strict. > 1 untolerates any neighboring obstacle point   
-    gridmap_conf_thr:       0.5 # 0.2 (willowgarage)          # the higher the more strict
+    savemap_at_the_end:     true
+    costmap_conf_thr:       0.4 # 0.4 (works for willowgarage) # 0.4 (fetch)   # the higher the more strict. > 1 untolerates any neighboring obstacle point   
+    gridmap_conf_thr:       0.3 # 0.2 (willowgarage)          # the higher the more strict
     occupancy_thr:          50       # 0 ~ 100
     lethal_cost_thr:        90 #10   # 0 ~ 100  uk= -1      # the lower the more strict 
-    global_width:           4096 #2048 
-    global_height:          4096 #2048 
+    global_width:           8192 #4096 # 8192 for WGx3 and 3072 is sufficent for WGx1 #2048 
+    global_height:          8192 #4096 # 3072 is sufficient for 1x WG #2048 
     active_width:           512
     active_height:          512
     num_downsamples:        1 #2  # 1 if global with is 1024, 2 if 2048 

@@ -67,7 +67,7 @@ mn_num_classes(8)
 
 	m_nh.getParam("/neuroexplorer/debug_data_save_path", m_str_debugpath);
 	m_nh.getParam("/neuroexplorer/ne_report_file", mstr_report_filename);
-
+	m_nh.param("/neuroexplorer/savemap_at_the_end", mb_savemap, true );
 	m_nh.param("/neuroexplorer/costmap_conf_thr", fcostmap_conf_thr, 0.1f);
 	m_nh.param("/neuroexplorer/gridmap_conf_thr", fgridmap_conf_thr, 0.8f);
 	m_nh.param("/neuroexplorer/occupancy_thr", mn_occupancy_thr, 50);
@@ -527,6 +527,14 @@ m_ofs_ae_report.close();
 //	ROS_INFO("total planning time (sec) %f \n", mf_totalplanningtime_msec / 1000 );
 //	ROS_INFO("avg callback time (msec) %f \n", favg_callback_time  );
 //	ROS_INFO("avg planning time (msec) %f \n", favg_planning_time  );
+
+// savemap img
+	if( mb_savemap)
+	{
+		char mapsave_cmd[300];
+		sprintf(mapsave_cmd,"rosrun map_server map_saver -f %s/explored_map map:=/map", m_str_debugpath.c_str() );
+		system(mapsave_cmd);
+	}
 
 	ROS_INFO("The exploration task is done... publishing -done- msg" );
 	std_msgs::Bool done_task;
@@ -1297,26 +1305,42 @@ void NeuroExplorer::updateUnreachablePointSet( const nav_msgs::OccupancyGrid& gl
 
 }
 
-int NeuroExplorer::selectNextClosestPoint( const geometry_msgs::PoseStamped& robotpose, const nav_msgs::Path& goalexclusivefpts, geometry_msgs::PoseStamped& nextbestpoint  )
+int NeuroExplorer::sort_by_distance_to_robot( const geometry_msgs::PoseStamped& robotpose, vector<geometry_msgs::PoseStamped>& frontierpoints )
+{
+	std::sort( begin(frontierpoints), end(frontierpoints), [robotpose](const geometry_msgs::PoseStamped& lhs, const geometry_msgs::PoseStamped& rhs)
+	{ return NeuroExplorer::euc_dist(robotpose, lhs) < NeuroExplorer::euc_dist(robotpose, rhs); });
+
+//	for (const auto & pi : frontierpoints )
+//	{
+//		float fdist = euc_dist( pi, robotpose ) ;
+//		ROS_INFO("dist to rpose (%f %f) : %f \n", pi.pose.position.x, pi.pose.position.y, fdist );
+//	}
+
+	return 1;
+}
+
+int NeuroExplorer::selectNextClosestPoint( const geometry_msgs::PoseStamped& robotpose, const vector<geometry_msgs::PoseStamped>& vmsg_frontierpoints, geometry_msgs::PoseStamped& nextbestpoint  )
 {
 	std::vector<cv::Point2f> cvfrontierpoints;
 	cv::Point2f cvrobotpoint( robotpose.pose.position.x, robotpose.pose.position.y );
 
-	for (const auto & pi : goalexclusivefpts.poses)
+	for (const auto & pi : vmsg_frontierpoints)
 		cvfrontierpoints.push_back(  cv::Point2f(pi.pose.position.x, pi.pose.position.y) );
 
 	std::sort( begin(cvfrontierpoints), end(cvfrontierpoints), [cvrobotpoint](const cv::Point2f& lhs, const cv::Point2f& rhs)
 			{ return NeuroExplorer::euc_dist(cvrobotpoint, lhs) < NeuroExplorer::euc_dist(cvrobotpoint, rhs); });
 
-	for (const auto & pi : cvfrontierpoints )
-	{
-		float fdist = euc_dist( pi, cvrobotpoint ) ;
-		//ROS_INFO("dist to alternative goals (%f %f) : %f \n", pi.x, pi.y, fdist );
-	}
+//	for (const auto & pi : cvfrontierpoints )
+//	{
+//		float fdist = euc_dist( pi, cvrobotpoint ) ;
+//		//ROS_INFO("dist to alternative goals (%f %f) : %f \n", pi.x, pi.y, fdist );
+//	}
 
 //	ROS_ASSERT( ++mn_prev_nbv_posidx >= 0 ); // to prev possible oscillation in selecting next best point
 
 	ROS_WARN("The next best target is < %f %f > \n", cvfrontierpoints[0].x, cvfrontierpoints[0].y);
+	if( cvfrontierpoints.size() > 1 )
+		ROS_WARN("The next next best target is < %f %f > \n", cvfrontierpoints[1].x, cvfrontierpoints[1].y);
 
 	nextbestpoint.pose.position.x = cvfrontierpoints[0].x ;
 	nextbestpoint.pose.position.y = cvfrontierpoints[0].y ;
@@ -1328,7 +1352,7 @@ int NeuroExplorer::selectNextClosestPoint( const geometry_msgs::PoseStamped& rob
 
 int NeuroExplorer::selectNextBestPoint( const vector<geometry_msgs::PoseStamped>& vmsg_frontierpoints, int nbestidx, geometry_msgs::PoseStamped& nextbestpoint  )
 {
-	nextbestpoint = vmsg_frontierpoints[nbestidx+1];
+	nextbestpoint = vmsg_frontierpoints[nbestidx];
 	nextbestpoint.header.frame_id = m_worldFrameId ;
 	nextbestpoint.header.stamp = ros::Time::now();
 }
@@ -1416,7 +1440,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	.............................................................
 	.............................++++++++++++++++++++++++........
 	.............................++++++++++++++++++++++++........
-	.............................++++++++++++++++++++++++........
+	.............................++++++++++(amox, amoy)++........
 	.............................++++++++++++++++++++++++........
 	........................(gmox,gmoy)++++++++++++++++++........
 	.............................................................
@@ -1543,12 +1567,6 @@ sprintf(tmptmp,"%s/fr_img%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/img2.png", I2);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss.png", G);
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/gmap_tfrom.png", gmap_tform);
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/gauss_img.png", gaussimg_32f * 255.f);
-
-//char tmpastar[200];
-//sprintf(tmpastar,"/home/hankm/results/neuro_exploration_res/astar_net_input%04d.png", mn_mapcallcnt);
-//cv::imwrite(tmpastar, astar_net_input * 255.f);
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/astar_net_input.png", astar_net_input * 255.f);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						run astar prediction
@@ -1583,7 +1601,48 @@ double covrew_time = (CRendTime - CRstartTime ).toNSec() * 1e-6;
 //fs.release();       // flush.
 //cv::imwrite("/home/hankm/results/neuro_exploration_res/covrew_net_output.png", covrew_prediction * 255.f );
 
-//CV_Assert(0);
+#ifdef SAVE_DNN_OUTPUTS
+
+// save gridmap
+char cgridmapfile[200], cgridmapinfofile[200], cgmapimg[200];
+sprintf(cgridmapfile,"%s/gmap%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strgmapfile(cgridmapfile);
+sprintf(cgridmapinfofile,"%s/gmap_info%04d.txt",m_str_debugpath.c_str(), mn_mapcallcnt);
+string strgmapinfofile(cgridmapinfofile);
+saveGridmap(strgmapfile, strgmapinfofile, m_gridmap);
+sprintf(cgmapimg,"%s/gmap%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+imwrite(cgmapimg, processed_gmap);
+//
+// save FR
+char cfrfile[200];
+sprintf(cfrfile,"%s/fr%04d.png",m_str_debugpath.c_str(), mn_mapcallcnt);
+imwrite(cfrfile, FR_am ); // fr_8u
+
+// save obs
+cv::Mat obs_map_8u, obs_m ;
+cv::threshold(processed_gmap, obs_map_8u, 254, 255, cv::THRESH_BINARY) ;
+//obs_map_8u.convertTo(obs_map_32f, CV_32F, 1.f/255.f);
+char tmpobs[200];
+sprintf(tmpobs,"%s/obsmap%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmpobs, obs_map_8u);
+
+// save gauss img
+char tmpgauss[200];
+sprintf(tmpgauss,"%s/gauss%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmpgauss, gaussimg_32f * 255.f);
+
+// save astar input
+char tmpastar[200];
+sprintf(tmpastar,"%s/astar_net_input%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmpastar, astar_net_input * 255.f);
+
+//// save viz-net input (FR + gridmap)
+//char tmpviz[200];
+//sprintf(tmpviz,"%s/viznet_input%04d.yml", m_str_debugpath.c_str(), mn_mapcallcnt);
+//cv::imwrite(tmpviz, viz_net_input * 255.f );
+
+#endif
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						Ensemble inv_potmap and covrew
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1656,17 +1715,12 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 
 // ==> gridmapDS_to_activemap 등 함수를 만들었고, 각 포인트 variable에 coord 명확하게 표기할 것 !!!
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	//int nx_localorig_wrt_cent_ds = ngmox_wrt_gcds - nox_roi_ds  ; // do minus operation: i.e) frontier_offset - (offset)
-	//int ny_localorig_wrt_cent_ds = ngmoy_wrt_gcds - noy_roi_ds  ;
 	vector<FrontierPoint> vo_localfpts_gm ;
 	vector<vector<cv::Point>> vvo_localfr_gm ;
 	vector<cv::Point> vfrcents_gm;
 
-//ROS_WARN("global orig (%d %d)  in ds (%d %d) localorig_wrt_cent_ds (%d %d) \n", mn_globalmap_xc_, mn_globalmap_yc_, ngmox_wrt_gcds, ngmoy_wrt_gcds, nx_localorig_wrt_cent_ds, ny_localorig_wrt_cent_ds ) ;
-//ROS_ASSERT(0);
-
 	int num_localFRs = locateFRfromFRimg(FR_am, rpos_gmds, amds_roi_orig, vvo_localfr_gm, vfrcents_gm);
+
 	int num_local_frontier_point = locateFptsFromPredimg(potmap_prediction, covrew_prediction, vfrcents_gm, rpos_gmds, amds_roi_orig, vo_localfpts_gm) ;
 
 	mvvo_localfr_gm  = vvo_localfr_gm ;
@@ -1713,8 +1767,7 @@ ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size
 
 	geometry_msgs::PoseStamped goal;
 	//nav_msgs::Path msg_frontierpoints ;
-	vector<geometry_msgs::PoseStamped> vmsg_frontierpoints ;
-	bool bexpand_to_global = false ;
+	vector<geometry_msgs::PoseStamped> vmsg_local_frontierpoints,  vmsg_global_frontierpoints;
 	if(num_local_frontier_point > 0)
 	{
 ROS_INFO("DNN process has found %d num of frontier points \n",  num_local_frontier_point);
@@ -1731,61 +1784,51 @@ ROS_INFO("DNN process has found %d num of frontier points \n",  num_local_fronti
 				float fdist = sqrtf( static_cast<float>(fdist_sq) );
 //ROS_INFO("fdist from <%f %f> to <%f %f> is  %f  %f \n", start.pose.position.x, start.pose.position.y, tmp_goal.pose.position.x, tmp_goal.pose.position.y, fdist_sq, fdist);
 				if (fdist > 1.f)
-					vmsg_frontierpoints.push_back(tmp_goal);
+					vmsg_global_frontierpoints.push_back(tmp_goal);
 			}
 		}
-ROS_INFO("Aftering inspecting global FR set we have found %d num of valid frontiers @ mapcallcnt %d \n", vmsg_frontierpoints.size(), mn_mapcallcnt );
-		if( vmsg_frontierpoints.size() == 0 )
+ROS_INFO("Aftering inspecting global FR set we have found %d num of valid frontiers @ mapcallcnt %d \n", vmsg_local_frontierpoints.size(), mn_mapcallcnt );
+		if( vmsg_local_frontierpoints.size() == 0 )
 		{
 ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to global fpts \n");
-			bexpand_to_global = true ;
 		}
+	}
+
+	// collect global frontier points
+	for (const auto & pi : m_curr_acc_frontierset)
+	{
+		geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
+		tmp_goal.header.frame_id = m_worldFrameId ;
+		double fdist_sq = (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) * (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) +
+				( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) * ( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) ;
+		float fdist = sqrtf( static_cast<float>(fdist_sq) );
+		if (fdist > 1.f)
+			vmsg_global_frontierpoints.push_back(tmp_goal);
+	}
+
+	// sort global frontiers by their distance to robot
+	sort_by_distance_to_robot( m_rpos_world,  vmsg_global_frontierpoints);
+
+	ROS_INFO(" There are %d num of valid local fpts and %d num of valid global fpts \n", vmsg_local_frontierpoints.size(), vmsg_global_frontierpoints.size() );
+	geometry_msgs::PoseStamped best_goal ;
+
+	if( vmsg_local_frontierpoints.size() == 0 && vmsg_global_frontierpoints.size() == 0) //num_global_frontier_point == 0 )
+	{
+		// should terminate the exploration task if no more global fpts is available
+		ROS_ERROR("Neither global nor local frontier points are available. Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
+		mb_explorationisdone = true;
+		return ;
+	}
+	else if( vmsg_local_frontierpoints.size() > 0)
+	{
+ROS_INFO(" There are %d num of local frontier points to visit. We select one from it \n", vmsg_local_frontierpoints.size() );
+		best_goal = vmsg_local_frontierpoints[0] ;
 	}
 	else
 	{
-		bexpand_to_global = true;
+ROS_WARN(" There is no valid local fpts. We select one from %d num of global fpts \n", vmsg_global_frontierpoints.size() );
+		best_goal = vmsg_global_frontierpoints[0] ;
 	}
-
-	if ( bexpand_to_global  )
-	{
-		if( m_curr_acc_frontierset.size() == 0) //num_global_frontier_point == 0 )
-		{
-			// should terminate the exploration task if no more global fpts is available
-			ROS_ERROR("Neither global nor local frontier points are available. Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
-			mb_explorationisdone = true;
-			return ;
-		}
-		else
-		{
-			for (const auto & pi : m_curr_acc_frontierset)
-			{
-				geometry_msgs::PoseStamped tmp_goal = StampedPosefromSE2( pi.p[0], pi.p[1], 0.f );
-				tmp_goal.header.frame_id = m_worldFrameId ;
-				double fdist_sq = (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) * (m_rpos_world.pose.position.x - tmp_goal.pose.position.x ) +
-						( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) * ( m_rpos_world.pose.position.y - tmp_goal.pose.position.y ) ;
-				float fdist = sqrtf( static_cast<float>(fdist_sq) );
-				if (fdist > 1.f)
-					vmsg_frontierpoints.push_back(tmp_goal);
-			}
-		}
-	}
-
-//ROS_INFO(" got valid frontier points \n");
-	geometry_msgs::PoseStamped best_goal = vmsg_frontierpoints[0] ;
-
-	// publish goalexclusive fpts
-//	nav_msgs::Path goalexclusivefpts ;
-//	goalexclusivefpts.header.frame_id = m_worldFrameId;
-//	goalexclusivefpts.header.seq = m_curr_acc_frontierset.size() -1 ;
-//	goalexclusivefpts.header.stamp = ros::Time::now();
-//	//for (const auto & pi : m_curr_acc_frontierset)
-//	for(int idx=1; idx < vmsg_frontierpoints.size(); idx++)
-//	{
-//		geometry_msgs::PoseStamped fpt = msg_frontierpoints.poses[idx]; //StampedPosefromSE2( pi.p[0], pi.p[1], 0.f ) ;
-//		fpt.header.frame_id = m_worldFrameId ;
-//		fpt.header.stamp = goalexclusivefpts.header.stamp ;
-//		goalexclusivefpts.poses.push_back(fpt);
-//	}
 
 // if the best frontier point is the same as the previous frontier point, we need to set a different goal
 	// check for ocsillation
@@ -1815,30 +1858,55 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 	}
 	else if( equals_to_prevgoal( best_goal ) ) //|| me_prev_exploration_state == ABORTED ) // cond to select the next best alternative
 	{
-		ROS_WARN(" The best target <%f %f> found by the planner is the same as the previous goal. Need to select an alternative target. \n",
+	ROS_WARN(" The best target <%f %f> found by the planner is the same as the previous goal. Need to select an alternative target. \n",
 				best_goal.pose.position.x,  best_goal.pose.position.y );
 
 		mb_nbv_selected = true ;
-		if( vmsg_frontierpoints.size() <= 1 )
+		if( vmsg_local_frontierpoints.size() <= 1 )
 		{
-			ROS_WARN(" However, there is no more frontier points to visit. \n");
-			publishVizMarkers( true );
-			mb_explorationisdone = true;
-			return;
+	ROS_WARN(" However, there is no more valid local frontier points to visit. \n");
+			if( vmsg_global_frontierpoints.size() <=1 )
+			{
+	ROS_ERROR(" Moreover, there is no more valid global frontier points to visit. \n");
+				mb_explorationisdone = true;
+				return;
+			}
+			else if( vmsg_global_frontierpoints.size() >=2 )
+			{
+	ROS_WARN(" We choose one global fpt instead \n");
+				publishVizMarkers( true );
+				geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( best_goal.pose.position.x, best_goal.pose.position.y, 0.f ) ;
+				appendUnreachablePoint(  ufpt ) ;
+
+				// choose the next best goal based on the eucdist heurisitic.
+	ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", vmsg_global_frontierpoints.size() );
+	ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n");
+				geometry_msgs::PoseStamped nextbestpoint = StampedPosefromSE2( 0.f, 0.f, 0.f ) ;
+				selectNextBestPoint( vmsg_global_frontierpoints, 1, nextbestpoint) ;
+				const std::unique_lock<mutex> lock(mutex_currgoal);
+				m_targetgoal.header.frame_id = m_worldFrameId ;
+				m_targetgoal.pose.pose = nextbestpoint.pose ;
+				m_previous_goal = m_targetgoal ;
+			}
 		}
+		else // target is equl to the previous goal and we have sufficient number of local fpts
+		{
+	ROS_WARN("We have sufficient num of local fpts. Therefore, we can choose one alternative pt from them \n");
+			// vmsg_local_frontierpoints.size() >= 2 case
+			publishVizMarkers( true );
+			geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( best_goal.pose.position.x, best_goal.pose.position.y, 0.f ) ;
+			appendUnreachablePoint(  ufpt ) ;
 
-		geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( best_goal.pose.position.x, best_goal.pose.position.y, 0.f ) ;
-		appendUnreachablePoint(  ufpt ) ;
-
-		// choose the next best goal based on the eucdist heurisitic.
-ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", vmsg_frontierpoints.size() );
-		geometry_msgs::PoseStamped nextbestpoint = StampedPosefromSE2( 0.f, 0.f, 0.f ) ;
-		selectNextBestPoint( vmsg_frontierpoints, 0, nextbestpoint) ;
-ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n");
-		const std::unique_lock<mutex> lock(mutex_currgoal);
-		m_targetgoal.header.frame_id = m_worldFrameId ;
-		m_targetgoal.pose.pose = nextbestpoint.pose ;
-		m_previous_goal = m_targetgoal ;
+			// choose the next best goal based on the eucdist heurisitic.
+	ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d local fpts> to be the next best target \n", vmsg_local_frontierpoints.size() );
+			geometry_msgs::PoseStamped nextbestpoint = StampedPosefromSE2( 0.f, 0.f, 0.f ) ;
+			selectNextBestPoint( vmsg_local_frontierpoints, 1, nextbestpoint) ;
+	ROS_WARN(" %f %f coord is chosen from local fpts ..  \n", nextbestpoint.pose.position.x, nextbestpoint.pose.position.y );
+			const std::unique_lock<mutex> lock(mutex_currgoal);
+			m_targetgoal.header.frame_id = m_worldFrameId ;
+			m_targetgoal.pose.pose = nextbestpoint.pose ;
+			m_previous_goal = m_targetgoal ;
+		}
 	}
 	else // ordinary case ( choosing the optimal pt, then move toward there )
 	{

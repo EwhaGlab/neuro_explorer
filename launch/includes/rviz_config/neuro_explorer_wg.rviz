@@ -447,7 +447,7 @@ Visualization Manager:
       Marker Topic: /frontier_region_markers
       Name: Marker
       Namespaces:
-        markers: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -509,7 +509,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 120.91010284423828
+      Distance: 200.52987670898438
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -517,9 +517,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 49.430885314941406
-        Y: -7.926156997680664
-        Z: 0.1021835133433342
+        X: -10.863825798034668
+        Y: -23.47239112854004
+        Z: 0.07274019718170166
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -527,7 +527,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
-      Yaw: 4.7123284339904785
+      Yaw: 3.1423206329345703
     Saved: ~
 Window Geometry:
   Displays:
@@ -547,5 +547,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 2488
-  X: 2632
+  X: 2143
   Y: 27

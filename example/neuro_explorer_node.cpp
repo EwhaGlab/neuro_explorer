@@ -184,7 +184,7 @@ int main(int argc, char** argv)
   	  default: ROS_ERROR("Invalid slam method \n");
   }
 
-  ROS_WARN(" Sutting down the exploration task \n");
+  ROS_WARN(" Shutting down the exploration task \n");
   //ros::shutdown(); lets shutdown from outside
 
   return 0;
