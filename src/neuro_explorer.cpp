@@ -578,16 +578,18 @@ void NeuroExplorer::publishVizMarkers( bool bviz_flag )
 		pos.z = 0.f;
 
 //		// local fr
-//		for( int ii=0; ii < mvvo_localfr_gm.size() ; ii++)
-//		{
-//			for(int jj=0; jj < mvvo_localfr_gm[ii].size(); jj++)
-//			{
-//				cv::Point2f pt = gridmap2world( mvvo_globalfr_gm[ii][jj] );
-//				fr.x = (float)pt.x ;
-//				fr.y = (float)pt.y ;
-//				vizdata.global_frontier_region_w.push_back(fr); // doesn't matter if it is local or global
-//			}
-//		}
+		for( int ii=0; ii < mvvo_localfr_gm.size() ; ii++)
+		{
+//			ROS_INFO("size of the cluster: %d \n", mvvo_localfr_gm[ii].size() );
+			for(int jj=0; jj < mvvo_localfr_gm[ii].size(); jj++)
+			{
+				cv::Point2f fpt = gridmap2world( mvvo_localfr_gm[ii][jj] );
+				fr.x = (float)fpt.x ;
+				fr.y = (float)fpt.y ;
+				//ROS_INFO("fr: %f %f \n", fr.x, fr.y );
+				vizdata.global_frontier_region_w.push_back(fr); // doesn't matter if it is local or global
+			}
+		}
 
 //		// global fr
 //		for( int ii=0; ii < mvvo_globalfr_gm.size() ; ii++)
@@ -1578,7 +1580,6 @@ ros::WallTime GPstartTime = ros::WallTime::now();
 ros::WallTime GPendTime = ros::WallTime::now();
 double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 ROS_INFO("done potmap prediction \n");
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/potmap_prediction.png", potmap_prediction * 255.f);
 
 ROS_INFO(" rpos_gm: %d %d  potmap size: %d %d %d\n", m_rpos_gm.x, m_rpos_gm.y, potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.channels() );
 
@@ -1599,7 +1600,7 @@ double covrew_time = (CRendTime - CRstartTime ).toNSec() * 1e-6;
 //cv::FileStorage fs(tmpastar, cv::FileStorage::WRITE);
 //fs << "mat1" << viz_net_input * 255.f;  // key, value store
 //fs.release();       // flush.
-//cv::imwrite("/home/hankm/results/neuro_exploration_res/covrew_net_output.png", covrew_prediction * 255.f );
+
 
 #ifdef SAVE_DNN_OUTPUTS
 
@@ -1636,10 +1637,15 @@ char tmpastar[200];
 sprintf(tmpastar,"%s/astar_net_input%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
 cv::imwrite(tmpastar, astar_net_input * 255.f);
 
-//// save viz-net input (FR + gridmap)
-//char tmpviz[200];
-//sprintf(tmpviz,"%s/viznet_input%04d.yml", m_str_debugpath.c_str(), mn_mapcallcnt);
-//cv::imwrite(tmpviz, viz_net_input * 255.f );
+// save
+char ctmpastarout[200];
+sprintf(ctmpastarout,"%s/astarnet_out%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(ctmpastarout, potmap_prediction * 255.f);
+
+// save viz-net out
+char tmpviz[200];
+sprintf(tmpviz,"%s/viznet_out%04d.png", m_str_debugpath.c_str(), mn_mapcallcnt);
+cv::imwrite(tmpviz, covrew_prediction * 255.f );
 
 #endif
 
