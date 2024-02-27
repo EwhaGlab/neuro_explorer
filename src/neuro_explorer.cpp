@@ -688,6 +688,7 @@ void NeuroExplorer::updatePrevFrontierPointsList( )
 		m_prev_acc_frontierset.clear() ;
 		m_curr_acc_frontierset.clear() ;
 		m_prev_acc_frontierset = frontier_set_tmp;
+ROS_INFO("Copied %d fpts from curr buffers to prev buff \n", m_prev_acc_frontierset.size() );
 	}
 }
 
@@ -1581,7 +1582,7 @@ ros::WallTime GPendTime = ros::WallTime::now();
 double planning_time = (GPendTime - GPstartTime ).toNSec() * 1e-6;
 ROS_INFO("done potmap prediction \n");
 
-ROS_INFO(" rpos_gm: %d %d  potmap size: %d %d %d\n", m_rpos_gm.x, m_rpos_gm.y, potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.channels() );
+ROS_INFO("rpos_gm: %d %d  potmap size: %d %d %d\n", m_rpos_gm.x, m_rpos_gm.y, potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.channels() );
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						run covrew prediction
@@ -1662,7 +1663,7 @@ cv::imwrite(tmpviz, covrew_prediction * 255.f );
 	double covrew_minVal, covrew_maxVal;
 	cv::minMaxLoc( covrew_prediction, &covrew_minVal, &covrew_maxVal );
 	int ncovrew_maxVal = static_cast<int>(covrew_maxVal);
-ROS_INFO("max of covrew %f \n", covrew_maxVal);
+//ROS_INFO("max of covrew %f \n", covrew_maxVal);
 
 //	vector<PointClass> ensembled_labeled_points; //labeled_points_corrected ;
 //	int num_labeled_points = assign_classes_to_points( ensembled_prediction, ensembled_labeled_points);
@@ -1675,6 +1676,7 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 //////////////// 		update unreachable frontiers;
 //////////////////////////////////////////////////////////////////////////////////////////////
 	updateUnreachablePointSet( globalcostmap );
+	set<pointset> curr_acc_frontierset_tmp ;
 
 	// init curr frontier point sets
 	{
@@ -1689,13 +1691,11 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 			int ngmy = static_cast<int>( (pi.p[1] - globalcostmap.info.origin.position.y) / cmresolution ) ;
 			if( frontier_sanity_check(ngmx, ngmy, cmwidth, cmdata) ) //if( cmdata[ ngmy * cmwidth + ngmx ] == -1 )
 			{
-				if( mo_frontierfilter.isReachable( m_unreachable_frontier_set, pi.p[0], pi.p[1] ) )
-				{
-					pointset pnew( pi.p[0], pi.p[1] );
-					m_curr_acc_frontierset.insert( pnew );
-				}
+				pointset pnew( pi.p[0], pi.p[1] );
+				curr_acc_frontierset_tmp.insert( pnew );
 			}
 		}
+ROS_INFO("We got %d num fpts from the prev buffer \n", m_prev_acc_frontierset.size());
 	}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1731,18 +1731,8 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 
 	mvvo_localfr_gm  = vvo_localfr_gm ;
 	mvo_localfpts_gm = vo_localfpts_gm;
-// update curr global_frontier_set
+// append local fpts to curr global_frontier_set
 	{
-//		const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
-//		for (size_t idx=0; idx < vo_globalfpts_gm.size(); idx++)
-//		{
-//			if( vo_globalfpts_gm[idx].isConfidentFrontierPoint() )
-//			{
-//				cv::Point2f frontier_in_world = vo_globalfpts_gm[idx].GetCorrectedWorldPosition() ;
-//				pointset pt( frontier_in_world.x, frontier_in_world.y );
-//				m_curr_acc_frontierset.insert( pt );
-//			}
-//		}
 		const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
 		for (size_t idx=0; idx < vo_localfpts_gm.size(); idx++)
 		{
@@ -1750,21 +1740,55 @@ ROS_INFO("max of covrew %f \n", covrew_maxVal);
 			{
 				cv::Point2f frontier_in_world = vo_localfpts_gm[idx].GetCorrectedWorldPosition() ;
 				pointset pt( frontier_in_world.x, frontier_in_world.y );
-				m_curr_acc_frontierset.insert( pt );
+				curr_acc_frontierset_tmp.insert( pt );
 			}
 		}
 	}
 
-ROS_INFO("num local fr cents : %d  \n", num_localFRs ) ;
-ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size(), num_local_frontier_point ) ;
-
-	if( num_local_frontier_point == 0 && m_curr_acc_frontierset.empty() )
+// collect reachable pts only
 	{
-		ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
-		mb_explorationisdone = true;
-		return ;
+		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
+		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set);
+		for (const auto & pi : curr_acc_frontierset_tmp)
+		{
+	//ROS_INFO("checking reachability %f %f \n", pi.p[0], pi.p[1] );
+			int ngmx = static_cast<int>( (pi.p[0] - globalcostmap.info.origin.position.x) / cmresolution ) ;
+			int ngmy = static_cast<int>( (pi.p[1] - globalcostmap.info.origin.position.y) / cmresolution ) ;
+			if( frontier_sanity_check(ngmx, ngmy, cmwidth, cmdata) ) //if( cmdata[ ngmy * cmwidth + ngmx ] == -1 )
+			{
+				if( mo_frontierfilter.isReachable( m_unreachable_frontier_set, pi.p[0], pi.p[1] ) )
+				{
+					pointset pnew( pi.p[0], pi.p[1] );
+					m_curr_acc_frontierset.insert( pnew );
+				}
+			}
+		}
 	}
 
+// report unreachable pts
+	{
+		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set) ;
+		ROS_WARN("num of unreachable fpts: %d \n", m_unreachable_frontier_set.size() );
+		for (const auto & di : m_unreachable_frontier_set)
+		{
+			ROS_WARN("=========== < %f %f > is unreachable. Unreachable thr is < %f > \n", di.p[0], di.p[1], mf_neighoringpt_decisionbound);
+		}
+	}
+
+//ROS_INFO("num local fr cents : %d  \n", num_localFRs ) ;
+ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size(), num_local_frontier_point ) ;
+
+	{
+		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
+		if( num_local_frontier_point == 0 && m_curr_acc_frontierset.empty() )
+		{
+			ROS_INFO("==================================================================================================================\n");
+			ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
+			ROS_INFO("==================================================================================================================\n");
+			mb_explorationisdone = true;
+			return ;
+		}
+	}
 //////////////////////////////////////////////////////////////////////////////////
 // 1. use the fp corresponds to the min distance as the init fp. epsilon = A*(fp)
 // 	i)  We first sort fpts based on their euc heuristic(), then try makePlan() for each of fpts in turn.
@@ -1836,6 +1860,8 @@ ROS_WARN(" There is no valid local fpts. We select one from %d num of global fpt
 		best_goal = vmsg_global_frontierpoints[0] ;
 	}
 
+ROS_INFO("The best goal found is @ (%f %f) \n", best_goal.pose.position.x, best_goal.pose.position.y);
+
 // if the best frontier point is the same as the previous frontier point, we need to set a different goal
 	// check for ocsillation
 	float fdist2prevposition = euc_dist( cv::Point2f( m_previous_robot_pose.pose.position.x, m_previous_robot_pose.pose.position.y ), cv::Point2f( m_rpos_world.pose.position.x, m_rpos_world.pose.position.y ) ) ;
@@ -1847,7 +1873,7 @@ ROS_WARN(" There is no valid local fpts. We select one from %d num of global fpt
 	bool bisocillating = (m_last_oscillation_reset + ros::Duration(8.0) < ros::Time::now() );
 	if( bisocillating ) // first check for oscillation
 	{
-		ROS_WARN("Oscillation detected. Set <%f %f> as unreachable fpt \n", m_previous_goal.pose.pose.position.x, m_previous_goal.pose.pose.position.y);
+	ROS_WARN("Oscillation detected. Set <%f %f> as unreachable fpt \n", m_previous_goal.pose.pose.position.x, m_previous_goal.pose.pose.position.y);
 
 		// publish current goal as unreachable pt
 		geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( m_previous_goal.pose.pose.position.x, m_previous_goal.pose.pose.position.y, 0.f ) ;
@@ -1866,6 +1892,8 @@ ROS_WARN(" There is no valid local fpts. We select one from %d num of global fpt
 	{
 	ROS_WARN(" The best target <%f %f> found by the planner is the same as the previous goal. Need to select an alternative target. \n",
 				best_goal.pose.position.x,  best_goal.pose.position.y );
+		geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( best_goal.pose.position.x, best_goal.pose.position.y, 0.f ) ;
+		appendUnreachablePoint( ufpt ) ;
 
 		mb_nbv_selected = true ;
 		if( vmsg_local_frontierpoints.size() <= 1 )
@@ -1881,14 +1909,12 @@ ROS_WARN(" There is no valid local fpts. We select one from %d num of global fpt
 			{
 	ROS_WARN(" We choose one global fpt instead \n");
 				publishVizMarkers( true );
-				geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( best_goal.pose.position.x, best_goal.pose.position.y, 0.f ) ;
-				appendUnreachablePoint(  ufpt ) ;
 
 				// choose the next best goal based on the eucdist heurisitic.
 	ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d goalexclusivefpts> to be the next best target \n", vmsg_global_frontierpoints.size() );
-	ROS_WARN("Selecting the next best point since frontier pts is unreachable ..  \n");
 				geometry_msgs::PoseStamped nextbestpoint = StampedPosefromSE2( 0.f, 0.f, 0.f ) ;
 				selectNextBestPoint( vmsg_global_frontierpoints, 1, nextbestpoint) ;
+	ROS_WARN("Selecting the next best point (%f %f) since frontier pts is unreachable ..  \n", nextbestpoint.pose.position.x, nextbestpoint.pose.position.y );
 				const std::unique_lock<mutex> lock(mutex_currgoal);
 				m_targetgoal.header.frame_id = m_worldFrameId ;
 				m_targetgoal.pose.pose = nextbestpoint.pose ;
@@ -1900,8 +1926,6 @@ ROS_WARN(" There is no valid local fpts. We select one from %d num of global fpt
 	ROS_WARN("We have sufficient num of local fpts. Therefore, we can choose one alternative pt from them \n");
 			// vmsg_local_frontierpoints.size() >= 2 case
 			publishVizMarkers( true );
-			geometry_msgs::PoseStamped ufpt = StampedPosefromSE2( best_goal.pose.position.x, best_goal.pose.position.y, 0.f ) ;
-			appendUnreachablePoint(  ufpt ) ;
 
 			// choose the next best goal based on the eucdist heurisitic.
 	ROS_WARN("The target goal is equal to the previous goal... Selecting NBV point from <%d local fpts> to be the next best target \n", vmsg_local_frontierpoints.size() );

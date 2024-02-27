@@ -24,6 +24,11 @@ odom_log = []
 path_length_log = []
 time_log = []
 end_flag = False
+achieve_30 = False
+achieve_40 = False
+achieve_50 = False
+achieve_60 = False
+achieve_70 = False
 achieve_80 = False
 achieve_85 = False
 achieve_90 = False
@@ -46,7 +51,7 @@ def get_gt(pgm_file, yaml_file):
 def callback(data):
     
     # -1:unkown 0:free 100:obstacle
-    global end_flag, start_time, achieve_80, achieve_85, achieve_90, achieve_95, last_msg_time
+    global end_flag, start_time, achieve_30, achieve_40, achieve_50, achieve_60, achieve_70, achieve_80, achieve_85, achieve_90, achieve_95, last_msg_time
     
     msg_secs = data.header.stamp.secs
     now = rospy.get_time()
@@ -72,11 +77,39 @@ def callback(data):
         exploration_rate_log.append(exploration_rate_over_time)
         #print("exploration time: {} rate: {}".format( curr_time - start_time, exploration_rate ) )
 
+        sys.stdout.write("exploration progress: %f%%   \r" % (exploration_rate * 100) )
+        sys.stdout.flush()
+
+        if exploration_rate >= 0.3 and (not achieve_30): 
+            print("achieve 0.3 coverage rate!")
+            print("T_30: {}".format( curr_time - start_time) )
+            achieve_30 = True
+            
+        if exploration_rate >= 0.4 and (not achieve_40): 
+            print("achieve 0.4 coverage rate!")
+            print("T_40: {}".format( curr_time - start_time) )
+            achieve_40 = True
+
+        if exploration_rate >= 0.5 and (not achieve_50): 
+            print("achieve 0.5 coverage rate!")
+            print("T_50: {}".format( curr_time - start_time) )
+            achieve_50 = True
+            
+        if exploration_rate >= 0.6 and (not achieve_60): 
+            print("achieve 0.6 coverage rate!")
+            print("T_60: {}".format( curr_time - start_time) )
+            achieve_60 = True
+
+        if exploration_rate >= 0.7 and (not achieve_70): 
+            print("achieve 0.7 coverage rate!")
+            print("T_70: {}".format( curr_time - start_time) )
+            achieve_70 = True
+
         if exploration_rate >= 0.8 and (not achieve_80): 
             print("achieve 0.8 coverage rate!")
             print("T_80: {}".format( curr_time - start_time) )
             achieve_80 = True
-            
+
         if exploration_rate >= 0.85 and (not achieve_85):
             print("achieve 0.85 coverage rate!")
             print("T_85: {}".format( curr_time - start_time) )
