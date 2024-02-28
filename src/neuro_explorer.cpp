@@ -58,7 +58,8 @@ mf_totalcallbacktime_msec(0.f), mf_totalmotiontime_msec(0.f),
 mf_avgcallbacktime_msec(0.f), 	mf_avgmotiontime_msec(0.f),
 mf_avg_fd_sessiontime_msec(0.f), mf_total_fd_sessiontime_msec(0.f),
 mf_avg_astar_sessiontime_msec(0.f), mf_total_astar_sessiontime_msec(0.f),
-mn_num_classes(8)
+mn_num_classes(8),
+mn_no_more_frontier_cnts(0)
 {
 	m_ae_start_time = ros::WallTime::now();
 
@@ -615,14 +616,11 @@ void NeuroExplorer::publishVizMarkers( bool bviz_flag )
 		}
 
 		// global fpts
+		for(const auto & pi : m_curr_acc_frontierset )
 		{
-			const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
-			for(const auto & pi : m_curr_acc_frontierset )
-			{
-				fpt.x = pi.p[0] ;
-				fpt.y = pi.p[1] ;
-				vizdata.global_fpts_w.push_back(fpt);
-			}
+			fpt.x = pi.p[0] ;
+			fpt.y = pi.p[1] ;
+			vizdata.global_fpts_w.push_back(fpt);
 		}
 		// unreachable fpts
 		{
@@ -680,16 +678,13 @@ void NeuroExplorer::appendUnreachablePoint( const geometry_msgs::PoseStamped& un
 
 void NeuroExplorer::updatePrevFrontierPointsList( )
 {
-	{
-		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
-		const std::unique_lock<mutex> lock_prev(mutex_prev_frontier_set);
-		set<pointset> frontier_set_tmp ;
-		frontier_set_tmp = m_curr_acc_frontierset ;
-		m_prev_acc_frontierset.clear() ;
-		m_curr_acc_frontierset.clear() ;
-		m_prev_acc_frontierset = frontier_set_tmp;
+	set<pointset> frontier_set_tmp ;
+	frontier_set_tmp = m_curr_acc_frontierset ;
+	m_prev_acc_frontierset.clear() ;
+	m_curr_acc_frontierset.clear() ;
+	m_prev_acc_frontierset = frontier_set_tmp;
 ROS_INFO("Copied %d fpts from curr buffers to prev buff \n", m_prev_acc_frontierset.size() );
-	}
+
 }
 
 void NeuroExplorer::initGlobalmapimgs( const int& cmheight, const int& cmwidth, const nav_msgs::OccupancyGrid& globalcostmap )
@@ -1397,6 +1392,12 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 		return;
 	}
 
+	if( mn_no_more_frontier_cnts > 3)
+	{
+		mb_explorationisdone = true;
+		return;
+	}
+
 	if(m_robotvel.linear.x == 0 && m_robotvel.angular.z == 0 ) // robot is physically stopped
 	{
 		const std::unique_lock<mutex> lock(mutex_robot_state) ;
@@ -1680,8 +1681,6 @@ cv::imwrite(tmpviz, covrew_prediction * 255.f );
 
 	// init curr frontier point sets
 	{
-		const std::unique_lock<mutex> lock_prev(mutex_prev_frontier_set);
-		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
 		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set);
 		// append valid previous frontier points after the sanity check
 		for (const auto & pi : m_prev_acc_frontierset)
@@ -1732,22 +1731,19 @@ ROS_INFO("We got %d num fpts from the prev buffer \n", m_prev_acc_frontierset.si
 	mvvo_localfr_gm  = vvo_localfr_gm ;
 	mvo_localfpts_gm = vo_localfpts_gm;
 // append local fpts to curr global_frontier_set
+
+	for (size_t idx=0; idx < vo_localfpts_gm.size(); idx++)
 	{
-		const std::unique_lock<mutex> lock(mutex_curr_frontier_set);
-		for (size_t idx=0; idx < vo_localfpts_gm.size(); idx++)
+		if( vo_localfpts_gm[idx].isConfidentFrontierPoint() )
 		{
-			if( vo_localfpts_gm[idx].isConfidentFrontierPoint() )
-			{
-				cv::Point2f frontier_in_world = vo_localfpts_gm[idx].GetCorrectedWorldPosition() ;
-				pointset pt( frontier_in_world.x, frontier_in_world.y );
-				curr_acc_frontierset_tmp.insert( pt );
-			}
+			cv::Point2f frontier_in_world = vo_localfpts_gm[idx].GetCorrectedWorldPosition() ;
+			pointset pt( frontier_in_world.x, frontier_in_world.y );
+			curr_acc_frontierset_tmp.insert( pt );
 		}
 	}
 
 // collect reachable pts only
 	{
-		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
 		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set);
 		for (const auto & pi : curr_acc_frontierset_tmp)
 		{
@@ -1778,17 +1774,17 @@ ROS_INFO("We got %d num fpts from the prev buffer \n", m_prev_acc_frontierset.si
 //ROS_INFO("num local fr cents : %d  \n", num_localFRs ) ;
 ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size(), num_local_frontier_point ) ;
 
+
+	if( num_local_frontier_point == 0 && m_curr_acc_frontierset.empty() )
 	{
-		const std::unique_lock<mutex> lock_curr(mutex_curr_frontier_set);
-		if( num_local_frontier_point == 0 && m_curr_acc_frontierset.empty() )
-		{
-			ROS_INFO("==================================================================================================================\n");
-			ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
-			ROS_INFO("==================================================================================================================\n");
-			mb_explorationisdone = true;
-			return ;
-		}
+		ROS_INFO("==================================================================================================================\n");
+		ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
+		ROS_INFO("==================================================================================================================\n");
+		//mb_explorationisdone = true;
+		mn_no_more_frontier_cnts++;
+		return ;
 	}
+
 //////////////////////////////////////////////////////////////////////////////////
 // 1. use the fp corresponds to the min distance as the init fp. epsilon = A*(fp)
 // 	i)  We first sort fpts based on their euc heuristic(), then try makePlan() for each of fpts in turn.
@@ -1846,7 +1842,7 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 	{
 		// should terminate the exploration task if no more global fpts is available
 		ROS_ERROR("Neither global nor local frontier points are available. Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
-		mb_explorationisdone = true;
+		mn_no_more_frontier_cnts++; //mb_explorationisdone = true;
 		return ;
 	}
 	else if( vmsg_local_frontierpoints.size() > 0)
@@ -1902,7 +1898,7 @@ ROS_INFO("The best goal found is @ (%f %f) \n", best_goal.pose.position.x, best_
 			if( vmsg_global_frontierpoints.size() <=1 )
 			{
 	ROS_ERROR(" Moreover, there is no more valid global frontier points to visit. \n");
-				mb_explorationisdone = true;
+				mn_no_more_frontier_cnts++; //mb_explorationisdone = true;
 				return;
 			}
 			else if( vmsg_global_frontierpoints.size() >=2 )
@@ -1945,6 +1941,7 @@ ROS_INFO("The best goal found is @ (%f %f) \n", best_goal.pose.position.x, best_
 		m_targetgoal.header.frame_id = m_worldFrameId ;
 		m_targetgoal.pose.pose = best_goal.pose ;
 		m_previous_goal = m_targetgoal ;
+		mn_no_more_frontier_cnts = 0;
 	}
 
 //////////////////////////////////////////////////////////////////////////////

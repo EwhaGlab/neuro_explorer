@@ -446,8 +446,6 @@ protected:
 private:
 	std::mutex mutex_robot_state;
 	std::mutex mutex_unreachable_frontier_set;
-	std::mutex mutex_curr_frontier_set ;
-	std::mutex mutex_prev_frontier_set ;
 
 	std::mutex mutex_gridmap;
 	std::mutex mutex_costmap;
@@ -480,7 +478,7 @@ private:
 	double mf_avg_covrew_sessiontime_msec, mf_total_covrew_sessiontime_msec;
 
 	vector<double> mvf_fr_detection_time, mvf_astar_time, mvf_covrew_time;
-
+	bool mn_no_more_frontier_cnts ;
 
 	ros::WallTime m_ae_start_time ;
 };
