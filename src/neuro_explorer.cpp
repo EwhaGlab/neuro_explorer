@@ -1654,8 +1654,8 @@ cv::imwrite(tmpviz, covrew_prediction * 255.f );
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 						Ensemble inv_potmap and covrew
 //////////////////////////////////////////////////////////////////////////////////////////////
-	cv::Mat ensembled_prediction = cv::Mat::zeros( potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.depth() );
-	ensemble_predictions(potmap_prediction, covrew_prediction, ensembled_prediction);
+	//cv::Mat ensembled_prediction = cv::Mat::zeros( potmap_prediction.rows, potmap_prediction.cols, potmap_prediction.depth() );
+	//ensemble_predictions(potmap_prediction, covrew_prediction, ensembled_prediction);
 	//cv::Mat ensembled_prediction = potmap_prediction ; // continous 0 ~ 1
 
 //char tmppred[200];
@@ -1810,7 +1810,7 @@ ROS_INFO("DNN process has found %d num of frontier points \n",  num_local_fronti
 				float fdist = sqrtf( static_cast<float>(fdist_sq) );
 //ROS_INFO("fdist from <%f %f> to <%f %f> is  %f  %f \n", start.pose.position.x, start.pose.position.y, tmp_goal.pose.position.x, tmp_goal.pose.position.y, fdist_sq, fdist);
 				if (fdist > 1.f)
-					vmsg_global_frontierpoints.push_back(tmp_goal);
+					vmsg_local_frontierpoints.push_back(tmp_goal);
 			}
 		}
 ROS_INFO("Aftering inspecting global FR set we have found %d num of valid frontiers @ mapcallcnt %d \n", vmsg_local_frontierpoints.size(), mn_mapcallcnt );
@@ -1848,6 +1848,7 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 	else if( vmsg_local_frontierpoints.size() > 0)
 	{
 ROS_INFO(" There are %d num of local frontier points to visit. We select one from it \n", vmsg_local_frontierpoints.size() );
+		// local fpts has been sorted already. Look at the func locateFptsFromPredimg() !!!
 		best_goal = vmsg_local_frontierpoints[0] ;
 	}
 	else
