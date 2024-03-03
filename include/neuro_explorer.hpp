@@ -478,7 +478,7 @@ private:
 	double mf_avg_covrew_sessiontime_msec, mf_total_covrew_sessiontime_msec;
 
 	vector<double> mvf_fr_detection_time, mvf_astar_time, mvf_covrew_time;
-	bool mn_no_more_frontier_cnts ;
+	bool mn_zero_FR_incident_cnts ;
 
 	ros::WallTime m_ae_start_time ;
 };

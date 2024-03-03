@@ -59,7 +59,7 @@ mf_avgcallbacktime_msec(0.f), 	mf_avgmotiontime_msec(0.f),
 mf_avg_fd_sessiontime_msec(0.f), mf_total_fd_sessiontime_msec(0.f),
 mf_avg_astar_sessiontime_msec(0.f), mf_total_astar_sessiontime_msec(0.f),
 mn_num_classes(8),
-mn_no_more_frontier_cnts(0)
+mn_zero_FR_incident_cnts(0)
 {
 	m_ae_start_time = ros::WallTime::now();
 
@@ -1392,7 +1392,7 @@ ros::WallTime	mapCallStartTime = ros::WallTime::now();
 		return;
 	}
 
-	if( mn_no_more_frontier_cnts > 3)
+	if( mn_zero_FR_incident_cnts > 3)
 	{
 		mb_explorationisdone = true;
 		return;
@@ -1781,7 +1781,7 @@ ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size
 		ROS_INFO("local frontier point is not found and the acc frontier set is empty. \n Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
 		ROS_INFO("==================================================================================================================\n");
 		//mb_explorationisdone = true;
-		mn_no_more_frontier_cnts++;
+		mn_zero_FR_incident_cnts++;
 		return ;
 	}
 
@@ -1842,7 +1842,7 @@ ROS_WARN("None of local fpts found by DNN is valid. Expanding our scope to globa
 	{
 		// should terminate the exploration task if no more global fpts is available
 		ROS_ERROR("Neither global nor local frontier points are available. Finishing up the exploration process @ mapcallcnt %d  \n ", mn_mapcallcnt);
-		mn_no_more_frontier_cnts++; //mb_explorationisdone = true;
+		mn_zero_FR_incident_cnts++; //mb_explorationisdone = true;
 		return ;
 	}
 	else if( vmsg_local_frontierpoints.size() > 0)
@@ -1898,7 +1898,7 @@ ROS_INFO("The best goal found is @ (%f %f) \n", best_goal.pose.position.x, best_
 			if( vmsg_global_frontierpoints.size() <=1 )
 			{
 	ROS_ERROR(" Moreover, there is no more valid global frontier points to visit. \n");
-				mn_no_more_frontier_cnts++; //mb_explorationisdone = true;
+				mn_zero_FR_incident_cnts++; //mb_explorationisdone = true;
 				return;
 			}
 			else if( vmsg_global_frontierpoints.size() >=2 )
@@ -1936,12 +1936,13 @@ ROS_INFO("The best goal found is @ (%f %f) \n", best_goal.pose.position.x, best_
 	}
 	else // ordinary case ( choosing the optimal pt, then move toward there )
 	{
+		ROS_INFO("Oridinary case. i.e, we have sufficient # of fpts \n");
 		mb_nbv_selected = false ;
 		const std::unique_lock<mutex> lock(mutex_currgoal);
 		m_targetgoal.header.frame_id = m_worldFrameId ;
 		m_targetgoal.pose.pose = best_goal.pose ;
 		m_previous_goal = m_targetgoal ;
-		mn_no_more_frontier_cnts = 0;
+		mn_zero_FR_incident_cnts = 0;
 	}
 
 //////////////////////////////////////////////////////////////////////////////
