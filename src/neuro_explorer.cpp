@@ -1382,6 +1382,8 @@ void NeuroExplorer::mapdataCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg
 {
 
 ROS_INFO("********** \t start mapdata callback routine \t ********** \n");
+ROS_INFO(" lambda:  %f \n",  mf_lambda);
+ROS_INFO(" Zero FR incident cnt reached %d \n ", mn_zero_FR_incident_cnts );
 
 ros::WallTime	mapCallStartTime = ros::WallTime::now();
 	//ROS_INFO("@ mapdataCallback() ");
@@ -1762,14 +1764,14 @@ ROS_INFO("We got %d num fpts from the prev buffer \n", m_prev_acc_frontierset.si
 	}
 
 // report unreachable pts
-	{
-		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set) ;
-		ROS_WARN("num of unreachable fpts: %d \n", m_unreachable_frontier_set.size() );
-		for (const auto & di : m_unreachable_frontier_set)
-		{
-			ROS_WARN("=========== < %f %f > is unreachable. Unreachable thr is < %f > \n", di.p[0], di.p[1], mf_neighoringpt_decisionbound);
-		}
-	}
+//	{
+//		const std::unique_lock<mutex> lock_unrc(mutex_unreachable_frontier_set) ;
+//		ROS_WARN("num of unreachable fpts: %d \n", m_unreachable_frontier_set.size() );
+//		for (const auto & di : m_unreachable_frontier_set)
+//		{
+//			ROS_WARN("=========== < %f %f > is unreachable. Unreachable thr is < %f > \n", di.p[0], di.p[1], mf_neighoringpt_decisionbound);
+//		}
+//	}
 
 //ROS_INFO("num local fr cents : %d  \n", num_localFRs ) ;
 ROS_INFO("global acc fpts / local fpts : %d %d  \n", m_curr_acc_frontierset.size(), num_local_frontier_point ) ;

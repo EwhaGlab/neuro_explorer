@@ -30,7 +30,6 @@ achieve_50 = False
 achieve_60 = False
 achieve_70 = False
 achieve_80 = False
-achieve_85 = False
 achieve_90 = False
 achieve_95 = False
 start_time = 0
@@ -38,9 +37,10 @@ last_msg_time = 0
 gt_area = 0
 begin_timing = False
 num_robots = 1
-
+T_report = np.ones([1, 8]) * np.inf
 single_map_list = [OccupancyGrid() for i in range(num_robots)]
 single_robot_coverage_rate_list = [0 for i in range(num_robots)]
+res_dir = '/home/hankm/results/neuro_exploration_res/lambda_study'
 
 def get_gt(pgm_file, yaml_file):
     map_img = np.array(Image.open(pgm_file))
@@ -51,7 +51,7 @@ def get_gt(pgm_file, yaml_file):
 def callback(data):
     
     # -1:unkown 0:free 100:obstacle
-    global end_flag, start_time, achieve_30, achieve_40, achieve_50, achieve_60, achieve_70, achieve_80, achieve_85, achieve_90, achieve_95, last_msg_time
+    global end_flag, start_time, achieve_30, achieve_40, achieve_50, achieve_60, achieve_70, achieve_80, achieve_90, achieve_95, last_msg_time
     
     msg_secs = data.header.stamp.secs
     now = rospy.get_time()
@@ -80,62 +80,81 @@ def callback(data):
         sys.stdout.write("exploration progress: %f%%   \r" % (exploration_rate * 100) )
         sys.stdout.flush()
 
-        if exploration_rate >= 0.3 and (not achieve_30): 
+        if exploration_rate >= 0.3 and (not achieve_30):
+            t30 = curr_time - start_time
             print("achieve 0.3 coverage rate!")
-            print("T_30: {}".format( curr_time - start_time) )
+            print("T_30: {}".format( t30 ) )
             achieve_30 = True
+            T_report[:, 0] = t30
             
-        if exploration_rate >= 0.4 and (not achieve_40): 
+        if exploration_rate >= 0.4 and (not achieve_40):
+            t40 = curr_time - start_time
             print("achieve 0.4 coverage rate!")
-            print("T_40: {}".format( curr_time - start_time) )
+            print("T_40: {}".format( t40 ) )
             achieve_40 = True
+            T_report[:, 1] = t40
 
-        if exploration_rate >= 0.5 and (not achieve_50): 
+        if exploration_rate >= 0.5 and (not achieve_50):
+            t50 = curr_time - start_time
             print("achieve 0.5 coverage rate!")
-            print("T_50: {}".format( curr_time - start_time) )
+            print("T_50: {}".format( t50 ) )
             achieve_50 = True
-            
-        if exploration_rate >= 0.6 and (not achieve_60): 
+            T_report[:, 2] = t50
+
+        if exploration_rate >= 0.6 and (not achieve_60):
+            t60 = curr_time - start_time
             print("achieve 0.6 coverage rate!")
-            print("T_60: {}".format( curr_time - start_time) )
+            print("T_60: {}".format( t60 ) )
             achieve_60 = True
+            T_report[:, 3] = t60
 
-        if exploration_rate >= 0.7 and (not achieve_70): 
+        if exploration_rate >= 0.7 and (not achieve_70):
+            t70 = curr_time - start_time
             print("achieve 0.7 coverage rate!")
-            print("T_70: {}".format( curr_time - start_time) )
+            print("T_70: {}".format( t70 ) )
             achieve_70 = True
+            T_report[:, 4] = t70
 
-        if exploration_rate >= 0.8 and (not achieve_80): 
+        if exploration_rate >= 0.8 and (not achieve_80):
+            t80 = curr_time - start_time
             print("achieve 0.8 coverage rate!")
-            print("T_80: {}".format( curr_time - start_time) )
+            print("T_80: {}".format( t80 ) )
             achieve_80 = True
+            T_report[:, 5] = t80
 
-        if exploration_rate >= 0.85 and (not achieve_85):
-            print("achieve 0.85 coverage rate!")
-            print("T_85: {}".format( curr_time - start_time) )
-            achieve_85 = True
-            
         if exploration_rate >= 0.9 and (not achieve_90):
+            t90 = curr_time - start_time
             print("achieve 0.9 coverage rate!")
-            print("T_90: {}".format( curr_time - start_time) )
+            print("T_90: {}".format( t90) )
             achieve_90 = True
-        
+            T_report[:, 6] = t90
+
         if exploration_rate >= 0.95 and (not achieve_95):
+            t95 = curr_time - start_time
             print("achieve 0.95 coverage rate!")
-            print("T_95: ", curr_time - start_time)
+            print("T_95: {}".format(t95) )
             achieve_95 = True
+            T_report[:, 7] = t95
 
         if exploration_rate >= 0.99:
+            t99 = curr_time - start_time
             print("exploration ends!")
-            print("T_total: ", curr_time - start_time)
+            print("T_total: {}".format(t99))
+            end_flag = True
+            T_report[:, 8] = t99
+
             # # compute coverage std
             # coverage_std = np.std(np.array(single_robot_coverage_rate_list))
             # print("exploration coverage std: ", coverage_std)
             # # compute overlap rate
             # overlap_rate = np.sum(np.array(single_robot_coverage_rate_list)) - 1
             # print("exploration overlap rate: ", overlap_rate)
+    else:
+        print('saving T report  \n')
+        print(T_report)
+        outfile = '%s/coverage_time.txt'%res_dir
+        np.savetxt(outfile, T_report, fmt='%6.2f')
 
-            end_flag = True        
         #time.sleep(1)
     #else:
         #time.sleep(1)
@@ -190,8 +209,12 @@ def main(argv):
     rospy.Subscriber("begin_exploration", Bool, StartCallback)
     rospy.Subscriber("map",  OccupancyGrid, callback, queue_size=1)
     #rospy.Subscriber("odom", Odometry, odom_callback, queue_size=1)
-    rospy.spin()
-
+    #rospy.spin()
+    while not rospy.is_shutdown():
+        data = rospy.wait_for_message('exploration_is_done', Bool, timeout=None)
+        print("exploration done? %d" % data.data)
+        if data.data is True:
+            break
 
 if __name__ == '__main__':
     main(sys.argv)

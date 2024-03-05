@@ -11,6 +11,7 @@
     <arg name="namespace" default=""/>
     <arg name="numthreads" default="8"/>
     <arg name="slam_method" default="gtmapping"/> <!-- "gmapping" -->
+    <arg name="lambda" default="0.8"/>
     <!--param name="use_sim_time" value="true"/--> <!--by kmHan-->  
     <!--param name="slam_method" value="$(arg slam_method)"/-->
     <param name="numthreads" value="$(arg numthreads)"/>
@@ -20,7 +21,9 @@
     
     <!--include file="$(find neuro_explorer)/launch/includes/explore_bench-corridor.launch"/-->
     
-    <node pkg="neuro_explorer" type="neuro_explorer_node" name="neuro_explorer" args="$(arg slam_method) $(arg numthreads)" output="screen"/>
+    <node pkg="neuro_explorer" type="neuro_explorer_node" name="neuroexplorer" args="$(arg slam_method) $(arg numthreads) $(arg lambda)" output="screen">
+        <param name="lambda" value="$(arg lambda)"/>
+    </node>
     <!--include file="$(find path_tracker)/launch/path_tracker.launch" output="screen"/-->
     <!--node pkg="neuro_explorer" type="neuro_explorer_node" name="neuro_explorer" output="screen">
         <param name="frame_id" type="string" value="map" />
