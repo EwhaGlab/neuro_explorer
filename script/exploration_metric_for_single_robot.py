@@ -33,6 +33,7 @@ achieve_80 = False
 achieve_90 = False
 achieve_95 = False
 start_time = 0
+curr_time = 0
 last_msg_time = 0
 gt_area = 0
 begin_timing = False
@@ -51,7 +52,7 @@ def get_gt(pgm_file, yaml_file):
 def callback(data):
     
     # -1:unkown 0:free 100:obstacle
-    global end_flag, start_time, achieve_30, achieve_40, achieve_50, achieve_60, achieve_70, achieve_80, achieve_90, achieve_95, last_msg_time
+    global end_flag, start_time, curr_time, achieve_30, achieve_40, achieve_50, achieve_60, achieve_70, achieve_80, achieve_90, achieve_95, last_msg_time, T_report
     
     msg_secs = data.header.stamp.secs
     now = rospy.get_time()
@@ -82,64 +83,64 @@ def callback(data):
 
         if exploration_rate >= 0.3 and (not achieve_30):
             t30 = curr_time - start_time
-            print("achieve 0.3 coverage rate!")
+            print("achieve 0.3 coverage rate! \n")
             print("T_30: {}".format( t30 ) )
             achieve_30 = True
             T_report[:, 0] = t30
             
         if exploration_rate >= 0.4 and (not achieve_40):
             t40 = curr_time - start_time
-            print("achieve 0.4 coverage rate!")
+            print("achieve 0.4 coverage rate! \n")
             print("T_40: {}".format( t40 ) )
             achieve_40 = True
             T_report[:, 1] = t40
 
         if exploration_rate >= 0.5 and (not achieve_50):
             t50 = curr_time - start_time
-            print("achieve 0.5 coverage rate!")
+            print("achieve 0.5 coverage rate! \n")
             print("T_50: {}".format( t50 ) )
             achieve_50 = True
             T_report[:, 2] = t50
 
         if exploration_rate >= 0.6 and (not achieve_60):
             t60 = curr_time - start_time
-            print("achieve 0.6 coverage rate!")
+            print("achieve 0.6 coverage rate!\n")
             print("T_60: {}".format( t60 ) )
             achieve_60 = True
             T_report[:, 3] = t60
 
         if exploration_rate >= 0.7 and (not achieve_70):
             t70 = curr_time - start_time
-            print("achieve 0.7 coverage rate!")
+            print("achieve 0.7 coverage rate!\n")
             print("T_70: {}".format( t70 ) )
             achieve_70 = True
             T_report[:, 4] = t70
 
         if exploration_rate >= 0.8 and (not achieve_80):
             t80 = curr_time - start_time
-            print("achieve 0.8 coverage rate!")
+            print("achieve 0.8 coverage rate!\n")
             print("T_80: {}".format( t80 ) )
             achieve_80 = True
             T_report[:, 5] = t80
 
         if exploration_rate >= 0.9 and (not achieve_90):
             t90 = curr_time - start_time
-            print("achieve 0.9 coverage rate!")
+            print("achieve 0.9 coverage rate!\n")
             print("T_90: {}".format( t90) )
             achieve_90 = True
             T_report[:, 6] = t90
 
         if exploration_rate >= 0.95 and (not achieve_95):
             t95 = curr_time - start_time
-            print("achieve 0.95 coverage rate!")
+            print("achieve 0.95 coverage rate!\n")
             print("T_95: {}".format(t95) )
             achieve_95 = True
             T_report[:, 7] = t95
 
         if exploration_rate >= 0.99:
             t99 = curr_time - start_time
-            print("exploration ends!")
-            print("T_total: {}".format(t99))
+            print("exploration ends!\n")
+            print('T_total: %f  Cov_total %f' % (t99, exploration_rate) )
             end_flag = True
             T_report[:, 8] = t99
 
@@ -150,10 +151,15 @@ def callback(data):
             # overlap_rate = np.sum(np.array(single_robot_coverage_rate_list)) - 1
             # print("exploration overlap rate: ", overlap_rate)
     else:
-        print('saving T report  \n')
-        print(T_report)
-        outfile = '%s/coverage_time.txt'%res_dir
-        np.savetxt(outfile, T_report, fmt='%6.2f')
+        # force to finish the processing
+        print('end_flag is up .. finishing the recording  \n')
+        pub = rospy.Publisher('exploration_is_done', Bool, queue_size=1)
+        done_task = Bool()
+        done_task.data = True
+        pub.publish(done_task)
+        #print(T_report)
+        #outfile = '%s/coverage_time.txt'%res_dir
+        #np.savetxt(outfile, T_report, fmt='%6.2f')
 
         #time.sleep(1)
     #else:
@@ -203,7 +209,7 @@ def StartCallback(data):
     print("Start time: ", start_time)
 
 def main(argv):
-    global gt_area
+    global gt_area, T_report, curr_time, end_flag
     gt_area = get_gt(argv[1], argv[2]) 
     rospy.init_node('exploration_metric', anonymous=True)
     rospy.Subscriber("begin_exploration", Bool, StartCallback)
@@ -212,9 +218,14 @@ def main(argv):
     #rospy.spin()
     while not rospy.is_shutdown():
         data = rospy.wait_for_message('exploration_is_done', Bool, timeout=None)
-        print("exploration done? %d" % data.data)
-        if data.data is True:
+        #print("received exploration_is_done msg \n")
+        if data.data is True or end_flag is True:
             break
+#    print("Finishing the exploration metric node \n")
+    print(T_report)
+    outfile = '%s/coverage_time.txt' % res_dir
+    np.savetxt(outfile, T_report, fmt='%6.2f')
+    print('T report is written \n exploration_metric is finished \n')
 
 if __name__ == '__main__':
     main(sys.argv)

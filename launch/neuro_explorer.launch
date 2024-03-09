@@ -22,13 +22,13 @@
     <!--include file="$(find neuro_explorer)/launch/includes/explore_bench-corridor.launch"/-->
     
     <node pkg="neuro_explorer" type="neuro_explorer_node" name="neuroexplorer" args="$(arg slam_method) $(arg numthreads) $(arg lambda)" output="screen">
-        <param name="lambda" value="$(arg lambda)"/>
+        <param name="lambda" value="$(arg lambda)" />
     </node>
     <!--include file="$(find path_tracker)/launch/path_tracker.launch" output="screen"/-->
     <!--node pkg="neuro_explorer" type="neuro_explorer_node" name="neuro_explorer" output="screen">
         <param name="frame_id" type="string" value="map" />
     </node-->
-    <node pkg="neuro_explorer" type="viz_helper_node" name="viz_helper" output="screen"/>
+    <node pkg="neuro_explorer" type="viz_helper_node" name="viz_helper" />
 
     <!--node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/-->    
 

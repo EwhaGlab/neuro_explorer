@@ -71,7 +71,7 @@
   <arg name="move_forward_only" default="false"/>
   <arg name="robot_name"/>
 
-  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">  
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" > <!--output="screen"-->  
     <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS" />
     <rosparam file="$(find neuro_explorer)/param/param_teb/costmap_common_params_$(arg model).yaml" command="load" ns="global_costmap" />
     <rosparam file="$(find neuro_explorer)/param/param_teb/costmap_common_params_$(arg model).yaml" command="load" ns="local_costmap" />

@@ -476,7 +476,8 @@ private:
 	double mf_avg_fd_sessiontime_msec, mf_total_fd_sessiontime_msec;
 	double mf_avg_astar_sessiontime_msec, mf_total_astar_sessiontime_msec;
 	double mf_avg_covrew_sessiontime_msec, mf_total_covrew_sessiontime_msec;
-
+	int mn_start_exploration_time, mn_tot_exploration_time ;
+	int mn_max_exploration_time ;
 	vector<double> mvf_fr_detection_time, mvf_astar_time, mvf_covrew_time;
 	int mn_zero_FR_incident_cnts ;
 

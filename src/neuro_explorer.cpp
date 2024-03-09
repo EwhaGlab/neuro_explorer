@@ -85,6 +85,7 @@ mn_zero_FR_incident_cnts(0)
 	m_nh.param("/neuroexplorer/strict_unreachable_decision", mb_strict_unreachable_decision, true);
 	m_nh.param("/neuroexplorer/allow_unknown", mb_allow_unknown, true);
 	m_nh.param("/neuroexplorer/lambda", mf_lambda, 0.5f);
+	m_nh.param("/neuroexplorer/max_exploration_time", mn_max_exploration_time, 3600);
 
 	m_nh.param("/move_base/global_costmap/resolution", mf_resolution, 0.05f) ;
 	m_nh.param("/move_base/global_costmap/robot_radius", mf_robot_radius, 0.12); // 0.3 for fetch
@@ -384,6 +385,8 @@ ROS_INFO("+++++++++++++++++ Start the init motion ++++++++++++++\n");
 
     uint32_t start_time = ros::Time::now().sec ;
     uint32_t curr_time = start_time ;
+    mn_start_exploration_time = static_cast<int>(start_time) ;
+ROS_INFO("start time: %d \n", start_time);
     while( curr_time < start_time + 4 )
     {
 		m_velPub.publish(cmd_vel);
@@ -1353,6 +1356,7 @@ int NeuroExplorer::selectNextBestPoint( const vector<geometry_msgs::PoseStamped>
 	nextbestpoint = vmsg_frontierpoints[nbestidx];
 	nextbestpoint.header.frame_id = m_worldFrameId ;
 	nextbestpoint.header.stamp = ros::Time::now();
+	return 1;
 }
 
 int NeuroExplorer::moveBackWard()
@@ -1380,21 +1384,19 @@ int NeuroExplorer::moveBackWard()
 // mapcallback for dynamic mapsize (i.e for the cartographer)
 void NeuroExplorer::mapdataCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) //const octomap_server::mapframedata& msg )
 {
-
-ROS_INFO("********** \t start mapdata callback routine \t ********** \n");
-ROS_INFO(" lambda:  %f \n",  mf_lambda);
-ROS_INFO(" Zero FR incident cnt reached %d \n ", mn_zero_FR_incident_cnts );
-
-ros::WallTime	mapCallStartTime = ros::WallTime::now();
-	//ROS_INFO("@ mapdataCallback() ");
-
 	if(!mb_isinitmotion_completed)
 	{
 		ROS_WARN("FD has not fully instantiated yet !");
 		return;
 	}
 
-	if( mn_zero_FR_incident_cnts > 3)
+ROS_INFO("********** \t start mapdata callback routine \t ********** \n");
+ros::WallTime	mapCallStartTime = ros::WallTime::now();
+mn_tot_exploration_time = static_cast<int>(ros::Time::now().sec) - mn_start_exploration_time;
+ROS_INFO("lambda:  %f \n",  mf_lambda);
+ROS_INFO("Zero FR incident cnt reached %d \n time spent %d (s)\n", mn_zero_FR_incident_cnts,  mn_tot_exploration_time);
+
+	if( mn_zero_FR_incident_cnts > 3 || mn_tot_exploration_time > mn_max_exploration_time)
 	{
 		mb_explorationisdone = true;
 		return;

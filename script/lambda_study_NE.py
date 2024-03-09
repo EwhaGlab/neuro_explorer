@@ -22,7 +22,7 @@ def main(argv):
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
-    launch_world = 'corner.launch' #['room.launch', 'corner.launch', 'corridor.launch', 'loop_with_corridor.launch']
+    launch_world = 'willowgarage.launch' #['room.launch', 'corner.launch', 'corridor.launch', 'loop_with_corridor.launch']
     worlds = ['room_with_corner', 'loop'] #['room', 'corner', 'corridor', 'loop_with_corridor']
 
     #widx = 1
@@ -33,8 +33,8 @@ def main(argv):
 
     start = time.time()
     weights = np.arange(start=0, stop=1.1, step=0.1)
-    for ii in range(0, len(weights)):
-        for ridx in range(0, 10):
+    for ii in range(1, len(weights), 2):
+        for ridx in range(0, 5):
             # make data dir
             print("processing %d th round with lambda = %f\n" % (ridx, weights[ii]) )
             savedir = resdir
@@ -61,7 +61,7 @@ def main(argv):
             launch1 = roslaunch.parent.ROSLaunchParent(uuid, ["/home/hankm/catkin_ws/src/neuro_explorer/launch/includes/%s"%launch_world])
             launch2 = roslaunch.parent.ROSLaunchParent(uuid, ["/home/hankm/catkin_ws/src/neuro_explorer/launch/includes/explore_bench.launch"])
 
-            weight = 0.1
+            weight = weights[ii]
             weight_string = 'lambda:=%f' % weight
             cli_args = ["/home/hankm/catkin_ws/src/neuro_explorer/launch/neuro_explorer.launch", weight_string]
             launch3_args = cli_args[1:]
@@ -85,20 +85,21 @@ def main(argv):
 
             while not rospy.is_shutdown():
                 data = rospy.wait_for_message('exploration_is_done', Bool, timeout=None)
-                print("exploration done? %d" % data.data)
+                #print("exploration done? %d" % data.data)
                 if data.data is True:
                     break
-
             launch3.shutdown()
+            print("Launch3 is shut down\n")
             launch2.shutdown()
+            print("Launch2 is shut down\n")
             launch1.shutdown()
+            print("Launch1 is shut down\n")
             #time.sleep(5)
 
             # mv all res to the datadir
-            cmd = 'mv %s/coverage_time.txt %s/coverage_time_%d_%d.txt'% (resdir, savedir, ii, ridx)
+            cmd = 'mv %s/coverage_time.txt %s/coverage_time_lambda%02d_round%d.txt'% (resdir, savedir, ii, ridx)
             os.system(cmd)
 
-    print("hello")
     end = time.time()
     print("data gen time ",  (end - start) )
 
