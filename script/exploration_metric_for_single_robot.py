@@ -41,7 +41,7 @@ num_robots = 1
 T_report = np.ones([1, 8]) * np.inf
 single_map_list = [OccupancyGrid() for i in range(num_robots)]
 single_robot_coverage_rate_list = [0 for i in range(num_robots)]
-res_dir = '/home/hankm/results/neuro_exploration_res/lambda_study'
+res_dir = '/home/hankm/results/neuro_exploration_res/exploration_runs'
 
 def get_gt(pgm_file, yaml_file):
     map_img = np.array(Image.open(pgm_file))
