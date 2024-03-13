@@ -945,6 +945,9 @@ int NeuroExplorer::locateFptsFromPredimg( const cv::Mat& potmap_prediction, cons
 // sort fpts_gm by mf_value
 	std::sort(fpts_gm.begin(), fpts_gm.end(), sort_by_ensembled_value() ) ;
 
+//for(int idx=0; idx < fpts_gm.size(); idx++)
+//	ROS_INFO("emsembed scores %f \n", fpts_gm[idx].mf_ensembled_value);
+
 	// run filter
 	const float fcm_conf_thr = mo_frontierfilter.GetCostmapConf() ;
 	const float fgm_conf_thr = mo_frontierfilter.GetGridmapConf() ;
