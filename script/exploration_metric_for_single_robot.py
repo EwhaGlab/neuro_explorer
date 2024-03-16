@@ -38,10 +38,10 @@ last_msg_time = 0
 gt_area = 0
 begin_timing = False
 num_robots = 1
-T_report = np.ones([1, 8]) * np.inf
+T_report = np.ones([1, 9]) * np.inf # (30,40,50,60,70,80,90,95,99)
 single_map_list = [OccupancyGrid() for i in range(num_robots)]
 single_robot_coverage_rate_list = [0 for i in range(num_robots)]
-res_dir = '/home/hankm/results/neuro_exploration_res/exploration_runs'
+res_dir = '/home/hankm/results/neuro_exploration_res'
 
 def get_gt(pgm_file, yaml_file):
     map_img = np.array(Image.open(pgm_file))
@@ -141,8 +141,13 @@ def callback(data):
             t99 = curr_time - start_time
             print("exploration ends!\n")
             print('T_total: %f  Cov_total %f' % (t99, exploration_rate) )
-            end_flag = True
             T_report[:, 8] = t99
+            print(T_report)
+            outfile = '%s/coverage_time.txt' % res_dir
+            print('saving time file to  {})\n'.format(outfile))
+            np.savetxt(outfile, T_report, fmt='%6.2f')
+            print('T report is written \n exploration_metric is finished \n')
+            end_flag = True
 
             # # compute coverage std
             # coverage_std = np.std(np.array(single_robot_coverage_rate_list))
@@ -157,10 +162,6 @@ def callback(data):
         done_task = Bool()
         done_task.data = True
         pub.publish(done_task)
-        #print(T_report)
-        #outfile = '%s/coverage_time.txt'%res_dir
-        #np.savetxt(outfile, T_report, fmt='%6.2f')
-
         #time.sleep(1)
     #else:
         #time.sleep(1)
@@ -221,11 +222,11 @@ def main(argv):
         #print("received exploration_is_done msg \n")
         if data.data is True or end_flag is True:
             break
-#    print("Finishing the exploration metric node \n")
-    print(T_report)
-    outfile = '%s/coverage_time.txt' % res_dir
-    np.savetxt(outfile, T_report, fmt='%6.2f')
-    print('T report is written \n exploration_metric is finished \n')
+    print("Finishing the exploration metric node \n")
+    # print(T_report)
+    # outfile = '%s/coverage_time.txt' % res_dir
+    # np.savetxt(outfile, T_report, fmt='%6.2f')
+    # print('T report is written \n exploration_metric is finished \n')
 
 if __name__ == '__main__':
     main(sys.argv)

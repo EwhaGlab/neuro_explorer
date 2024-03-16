@@ -26,8 +26,8 @@
   <arg name="pgm_file" value ="$(find neuro_explorer)/blueprints/corridor.pgm"/>
   <arg name="yaml_file" value ="$(find neuro_explorer)/blueprints/corridor.yaml"/>
 
-  <!--node pkg="neuro_explorer" type="exploration_metric_for_single_robot.py" name="metric" args="$(arg pgm_file) $(arg yaml_file)" output="screen"> 
-  </node-->
+  <node pkg="neuro_explorer" type="exploration_metric_for_single_robot.py" name="metric" args="$(arg pgm_file) $(arg yaml_file)" output="screen"> 
+  </node>
       
   <!-- <node pkg="tf" type="static_transform_publisher" name="map_broadcaster" args="1 2 3 0 0 0 robot2/map robot2/odom 100" /> -->
 

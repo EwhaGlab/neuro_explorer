@@ -18,14 +18,11 @@ import roslaunch
 
 def main(argv):
     workdir = os.getcwd()
-    resdir = '/home/hankm/results/neuro_exploration_res/lambda_study'
-
+    resdir = '/home/hankm/results/neuro_exploration_res'
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
     launch_world = 'willowgarage.launch' #['room.launch', 'corner.launch', 'corridor.launch', 'loop_with_corridor.launch']
-    worlds = ['room_with_corner', 'loop'] #['room', 'corner', 'corridor', 'loop_with_corridor']
-
-    #widx = 1
+    #launch_world = 'corridor.launch'
     rospy.init_node('neuro_explorer_launcher', anonymous=True)
 
     listener = tf.TransformListener()
@@ -33,13 +30,13 @@ def main(argv):
 
     start = time.time()
     weights = np.arange(start=0, stop=1.1, step=0.1)
-    for ii in range(1, len(weights), 2):
-        for ridx in range(0, 5):
+    for ridx in range(0, 5):
+        for ii in range(0, len(weights), 2):
             # make data dir
             print("processing %d th round with lambda = %f\n" % (ridx, weights[ii]) )
             savedir = resdir
-            cmd = 'mkdir -p %s' % savedir
-            os.system(cmd)
+            #cmd = 'mkdir -p %s' % savedir
+            #os.system(cmd)
 
             # launch files
 
@@ -97,7 +94,7 @@ def main(argv):
             #time.sleep(5)
 
             # mv all res to the datadir
-            cmd = 'mv %s/coverage_time.txt %s/coverage_time_lambda%02d_round%d.txt'% (resdir, savedir, ii, ridx)
+            cmd = 'mv %s/coverage_time.txt %s/lambda_study/coverage_time_lambda%02d_round%d.txt'% (resdir, resdir, ii, ridx)
             os.system(cmd)
 
     end = time.time()
