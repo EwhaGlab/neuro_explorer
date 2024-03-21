@@ -1,15 +1,8 @@
 
-2024/1/31
+2024/3/21
 
-This program generates essential data for single-threaded planner in ~/binary_ws
-
-Gmap, Cmap, metadata (map info, robot pose info)
-
-1. Use this code to generate essential data for A* planner
-2. ae_report.txt saves A* run time
-3. Use ~/binary_ws/singleplanner_tests project to use data collected from the step 1.
-4. Compare the A* runtime btwn A*-Net and single-threaded A* code.
-
-
+-. Carried out IROS 2024 experiments with this code. 
+-. The code as is should work fine in WGx3. If it doesn't work there check out param/neuroexploration.yaml
+-. for Lambda study checkout the code  script/lamba_study_NE.py. Need to change param/neuroexploration.yaml. Make sure to change max_exploration_time
 
 

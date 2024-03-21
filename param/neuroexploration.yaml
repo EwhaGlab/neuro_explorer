@@ -3,8 +3,8 @@ neuroexplorer:
     debug_data_save_path:   '/home/hankm/results/neuro_exploration_res'
     ne_report_file:         'ne_report.txt'
     savemap_at_the_end:     true
-    costmap_conf_thr:       0.4 # 0.4 (works for willowgarage) # 0.4 (fetch)   # the higher the more strict. > 1 untolerates any neighboring obstacle point   
-    gridmap_conf_thr:       0.2 # 0.2 (willowgarage)          # the higher the more strict
+    costmap_conf_thr:       0.4 # (0.4 for willowgarage, 0.8 for small worlds) # 0.4 (fetch)   # the higher the more strict.==> thorough exploration, go lower for faster exploration. untolerates any neighboring obstacle point   
+    gridmap_conf_thr:       0.2 # (0.2 for willowgarage, 0.4 for small worlds) # the higher the more strict
     occupancy_thr:          50       # 0 ~ 100
     lethal_cost_thr:        90 #10   # 0 ~ 100  uk= -1      # the lower the more strict 
     global_width:           8192 #4096 # 8192 for WGx3 and 3072 is sufficent for WGx1 #2048 
