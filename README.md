@@ -1,15 +1,15 @@
-# Autoexplorer
-**Autoexplorer** package is a 2D mobile robot's exploration system based on frontier region detection.
-This package contains C++ implementation of our IROS22 paper: [Autoexplorer: Autonomous Exploration of Unknown Environments using Fast Frontier-Region Detection and Parallel Path Planning](http://graphics.ewha.ac.kr/autoexplorer/)
+# Neuro-Explorer
+**Neuro-Explorer** package is a 2D mobile robot's exploration system based on the learned frontier region detectors.
+This package contains C/C++ deployer the trained models elaborated in our IROS24 paper: [Neuro-Explorer: Efficient and Scalable Exploration Planning via Learned Frontier Regions](http://graphics.ewha.ac.kr/neuro_explorer/)
 Please refer to the paper if you have inquiries regarding the technical aspect of this package.
 
 ## Dependencies
 
-**Autoexplorer** is a ROS-compatible package. Therefore, we expect you to have Ubuntu 18.04 installed along with ROS Melodic.
-The package should work fine in Ubuntu 20.04 with ROS Noetic.
+**Neuro-Explorer** is a ROS-compatible package. Therefore, we expect you to have Ubuntu 20.04 installed along with ROS Noetic.
+We have not tested the package with ROS2 yet, but we will update this repo as soon as the package is ready for ROS2 also.
 
 You need the ROS navigation stack to control an embodied agent. 
-Autoexplorer runs best with our customized version of [navigation stack](https://github.com/han-kyung-min/navigation).  
+Neuro-Explorer runs best with our customized version of [navigation stack](https://github.com/han-kyung-min/navigation).  
 
 If you want to run this package in a synthetic environment, such as the Gazebo simulator, we recommend you install a mapping SW such as
 OctoMap. Use [Turtlebot3](https://github.com/ROBOTIS-GIT/turtlebot3) packages to explore your favorite world. 
@@ -17,10 +17,12 @@ Besides, we found [TEB](https://github.com/rst-tu-dortmund/teb_local_planner) lo
 In the case of solving real-world exploration problems with a mobile robot, you will need a SLAM SW to produce a 2D occupancy grid map. 
 We recommend installing [SLAM toolbox](https://github.com/SteveMacenski/slam_toolbox) for your localization and mapping.
 
+**Neuro-Explorer** deploys pre-trained network models in a [TensorFlow](https://www.tensorflow.org/install?hl=ko) environment. Refer to [neuro_ae]() to see how to install tensorflow and its dependencies. 
+
 ## To install
 ```
 cd ~/catkin_ws/src
-git clone https://github.com/EwhaGlab/autoexplorer.git
+git clone https://github.com/EwhaGlab/neuro_explorer.git
 cd ~/catkin_ws
 catkin_make install
 ```

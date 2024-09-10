@@ -100,32 +100,15 @@ int main(int argc, char** argv)
 
   switch( slamid[slam_method.c_str()] )
   {
-  	  case GMAPPING:
-  	  {
-		  ROS_ERROR("Autoexplorer doesn't support GMAPPING yet. It will be ready soon. \n");
-		  return -1;
-//		  FrontierDetectorSMS front_detector_sms(private_nh, nh);
-//		  ros::spinOnce();
-//		  front_detector_sms.initmotion();
-//		  front_detector_sms.SetInitMotionCompleted();
-//		  while( !front_detector_sms.isDone() && ros::ok() )
-//		  {
-//			  try{
-//				  ros::spinOnce();
-//			  }
-//			  catch(std::runtime_error& e)
-//			  {
-//				ROS_ERROR("frontier_detector exception: %s", e.what());
-//				return -1;
-//			  }
-//		  }
-//		  front_detector_sms.publishDone();
-//		  break;
-  	  }
+//  	  case GMAPPING:
+//  	  {
+//		  ROS_ERROR("Neuro-Explorer doesn't support GMAPPING yet. \n");
+//		  return -1;
+//  	  }
 
   	  case CARTOGRAPHER:
   	  {
-		  ROS_ERROR("Autoexplorer is not compatible with CARTOGRAPHER \n");
+		  ROS_ERROR("Neuro-Explorer is not compatible with CARTOGRAPHER yet. \n");
 		  return -1;
   	  }
   	  case SLAM_TOOLBOX:
