@@ -30,7 +30,7 @@
     </node-->
     <node pkg="neuro_explorer" type="viz_helper_node" name="viz_helper" />
 
-    <!--node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/-->    
+    <node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(arg rviz_config)"/>    
 
     <!-- bag -->
     <!--node pkg="rosbag" type="record" name="rosbag_record" args="record -a -o /media/hankm/4e250950-92e8-4cb2-8ba4-b67f04a12cf6/results/neuroexplorer/bags/"/-->
