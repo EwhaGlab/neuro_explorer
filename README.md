@@ -1,64 +1,74 @@
-# Neuro-Explorer
-**Neuro-Explorer** package is a 2D mobile robot's exploration system based on the learned frontier region detectors.
-This package contains C/C++ deployer the trained models elaborated in our IROS24 paper: [Neuro-Explorer: Efficient and Scalable Exploration Planning via Learned Frontier Regions](http://graphics.ewha.ac.kr/neuro_explorer/)
+# neuro_explorer
+**neuro_explorer** package is a 2D mobile robot's exploration system based on the learned frontier region detectors.
+This package contains C/C++ deployer of the trained models elaborated in our IROS24 paper: [Neuro-Explorer: Efficient and Scalable Exploration Planning via Learned Frontier Regions](http://graphics.ewha.ac.kr/neuro_explorer/)
 Please refer to the paper if you have inquiries regarding the technical aspect of this package.
 
 ## Dependencies
 
-**Neuro-Explorer** is a ROS-compatible package. Therefore, we expect you to have Ubuntu 20.04 installed along with ROS Noetic.
+**neuro_explorer** is a ROS-compatible package. Therefore, we expect you to have Ubuntu 20.04 installed along with ROS Noetic.
 We have not tested the package with ROS2 yet, but we will update this repo as soon as the package is ready for ROS2 also.
 
-You need the ROS navigation stack to control an embodied agent. 
-Neuro-Explorer runs best with our customized version of [navigation stack](https://github.com/han-kyung-min/navigation).  
+This package requires ROS navigation stack to control an embodied agent. 
+We recommend you to install our customized version of [navigation stack](https://github.com/han-kyung-min/navigation).
 
 If you want to run this package in a synthetic environment, such as the Gazebo simulator, we recommend you install a mapping SW such as
 OctoMap. Use [Turtlebot3](https://github.com/ROBOTIS-GIT/turtlebot3) packages to explore your favorite world. 
-Besides, we found [TEB](https://github.com/rst-tu-dortmund/teb_local_planner) local planner runs OK with this package, so we recommend you to install this local planner.
+Besides, we found [TEB](https://github.com/rst-tu-dortmund/teb_local_planner) local planner runs nicely with this package, so we recommend you to install this local planner.
 In the case of solving real-world exploration problems with a mobile robot, you will need a SLAM SW to produce a 2D occupancy grid map. 
 We recommend installing [SLAM toolbox](https://github.com/SteveMacenski/slam_toolbox) for your localization and mapping.
 
-**Neuro-Explorer** deploys pre-trained network models in a [TensorFlow](https://www.tensorflow.org/install?hl=ko) environment. Refer to [neuro_ae]() to see how to install tensorflow and its dependencies. 
+**neuro_explorer** deploys pre-trained network models in a [TensorFlow](https://www.tensorflow.org/install?hl=ko) environment. Refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git) to see how to install tensorflow and its dependencies for re-training the network models.
 To deploy the trained models in the C++ project, we utilize [TensorFlow C API library](https://www.tensorflow.org/install/lang_c). Make sure to install this package prior to install our package.
 
+## To install
 
-## To install base libraries and the conda environment
-
-Follow [TensorFlow C API library](https://www.tensorflow.org/install/lang_c)'s instruction
-
-Follow [neuro_ae]()'s instruction 
-
-## Example 1: To run Neuro-Explorer (NE) in WGx3 world
-
-If you are running NE on a synthetic environment such as a Gazebo world, follow the instructions below.
+# 1. Go over the following steps for installing TensorFlow related packages
 
 
-### Clone TEB local planner
+(1) Install [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git)
 
-```
-cd ~/catkin_ws/src
-git clone https://github.com/rst-tu-dortmund/teb_local_planner.git
-cd ~/catkin_ws
-catkin_make install
+(2) Follow [TensorFlow C API library](https://www.tensorflow.org/install/lang_c)'s instruction
 
-```
-### Install Turtlebot3 package
-```
-sudo apt-get install ros-<ros_ver>-turtlebot3
-```
-### Clone OctoMap (our customized version)
+# 2. Install ROS navigation required packages
+
+(1) Install Octomap 
+
 ```
 cd ~/catkin_ws/src
 git clone https://github.com/han-kyung-min/octomap_mapping.git
+cd octomap_mapping
 git checkout explore_bench-nn_burger-fast_gridmap_pub
+sudo apt-get install ros-<ros_ver>-octomap*
+sudo apt-get install ros-<ros_ver>-octomap-server
+cd ~/catkin_ws
+catkin_make install
 ```
-### Clone NavStack (our customized version)
+
+(2) Install Turtlebot3 package
+```
+sudo apt-get install ros-<ros_ver>-turtlebot3
+
+```
+(3) Install navigation stack
 ```
 cd ~/catkin_ws/src
 git clone https://github.com/han-kyung-min/navigation.git
+cd navigation
 git checkout proximity_check
+cd ~/catkin_ws
+catkin_make install
 ```
 
-## Install Neuro-Explorer 
+(4) Install teb_local_planner
+```
+cd ~/catkin_ws/src
+git clone https://github.com/rst-tu-dortmund/teb_local_planner
+cd teb_local_planner
+git checkout <your_ros_version_branch>
+cd ~/catkin_ws
+catkin_make -DCATKIN_WHITELIST_PACKAGES="teb_local_planner"
+```
+## 3 Install neuro_explorer
 ```
 cd ~/catkin_ws/src
 git clone https://github.com/EwhaGlab/neuro_explorer.git
@@ -66,9 +76,16 @@ cd ~/catkin_ws
 catkin_make install
 ```
 
-### Start the exploration task
-Open up three terminals followed by the command below on the each terminal window
-Don't forget to "source ~/catkin_ws/install/setup.bash" before starting the launch files below
+## 4. Download pre-trained models
+
+The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them under `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space, you have 2nd option to re-train the model. Refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git) for the re-trainning procedure.
+
+
+### Example 1: To run Neuro-Explorer (NE) in WGx3 world
+
+1. Open up three terminals followed by the command below on the each terminal window.
+2. Run `source ~/catkin_ws/install/setup.bash` for the each window 
+3. Run the commands below on the each window. 
 ```
 conda activate neuro_ae; roslaunch neuro_explorer WGx3.launch
 roslaunch neuro_explorer explorer_bench.launch
