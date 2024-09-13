@@ -76,14 +76,14 @@ catkin_make install
 
 ### 4. Download pre-trained models
 
-The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them under `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space, you have 2nd option to re-train the model. Refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git) for the re-trainning procedure.
+The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git).
 
 
 ## Exploring WGx3 world  
 
 1. Open up three terminals followed by the command below on the each terminal window.
-2. Run `source ~/catkin_ws/install/setup.bash` for the each window 
-3. Run the commands below on the each window. 
+2. In each terminal, run the command: `source ~/catkin_ws/install/setup.bash`. 
+3. Run the commands below in each terminal window. 
 ```
 conda activate neuro_ae; roslaunch neuro_explorer WGx3.launch
 roslaunch neuro_explorer explorer_bench.launch
@@ -91,7 +91,7 @@ roslaunch neuro_explorer neuro_explorer.launch
 ```
 
 ## Citaion
-Good luck with your projects! Please cite our paper if you think **Neuro-Explorer** is helpful for your research work.
+Good luck with your projects! Please cite our paper if you think **neuro_explorer** is helpful for your research work.
 
 ```
 K.M. Han and Y.J. Kim, "Neuro-Explorer: Efficient and Scalable Exploration Planning via Learned Frontier Regions," 
