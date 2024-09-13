@@ -25,13 +25,13 @@ To integrate the trained models into the C++ project, we utilize the [TensorFlow
 ## To install
 
 ### 1. Follow the steps below to install neuro_explorer_train and its dependencies
-> #### (1) Clone this repo
+> #### (1) Clone this repo 
 
 ```
   cd ~/catkin_ws/src
   git clone https://github.com/EwhaGlab/neuro_explorer.git
 ```
-> #### (2) Install [neuro_explorer_train](./neuro_explorer_train/README.md)
+> #### (2) Install [neuro_explorer_train](./neuro_explorer_train/README.md) 
 
 > #### (3) Install [TensorFlow C API library](https://www.tensorflow.org/install/lang_c) based on its instruction
 
@@ -79,7 +79,7 @@ To integrate the trained models into the C++ project, we utilize the [TensorFlow
 ### 3. Install neuro_explorer
 
 > #### (1) Modifying the config file
->> Open `<base_dir>/params/neuroexploration.yaml`, then modify and modify the following fields according to your requirements: `debug_data_save_path:`, `fd_model_filepath:`, `astar_model_filepath:`, and `covrew_model_filepath:`.
+>> Open `<base_dir>/params/neuroexploration.yaml`, then modify the following fields according to your requirements: `debug_data_save_path:`, `fd_model_filepath:`, `astar_model_filepath:`, and `covrew_model_filepath:`.
 
 >> where <base_dir> refers to `~/catkin_ws/src/neuro_explorer`
 
@@ -114,4 +114,4 @@ K.M. Han and Y.J. Kim, "Neuro-Explorer: Efficient and Scalable Exploration Plann
 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2024
 ```
 
-#### Feel free to send us an email if you are having a trouble with compiling this package.
+#### Feel free to send an email to *hankm@ewha.ac.kr* if you are having a trouble with compiling this package.

@@ -34,7 +34,7 @@ For example, to retrain A*Net model, follow these steps.
 
 > 1. Open the ```<base_dir>/neuro_explorer_train/configs/astarnet_params.yaml``` file.
 > 2. Modify the necessary fields, such as ```"data_dir"```, ```"outpath"```, and ```"outmodelfile"```, based on your requirements. 
-There are additional parameters available for tunning. Users are encouraged to adjust these settings, as long as they have a clear understanding of their effects.
+There are additional parameters available for tunning. Users may adjust these settings, as long as they have a clear understanding of their effects.
 
 > 3. Then, change directory to ```<base_dir>/neuro_explorer_train/example/astar_pot_predictor```
 > 4. Execute the commands below.
@@ -51,7 +51,7 @@ There are additional parameters available for tunning. Users are encouraged to a
 > and train VizNet by
 ```
   cd <base_dir>/neuro_explorer_train/example/coverage_predictor
- python train_viznet.py ../../configs/viznet_params.yaml
+  python train_viznet.py ../../configs/viznet_params.yaml
 ```
 
 ## Citation
@@ -63,7 +63,7 @@ K.M. Han and Y.J. Kim, "Neuro-Explorer: Efficient and Scalable Exploration Plann
 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2024
 ```
 
-#### Feel free to send us an email if you are having a trouble with compiling this package.
+#### Feel free to send an email to *hankm@ewha.ac.kr* if you are having a trouble with compiling this package.
 
 
 
