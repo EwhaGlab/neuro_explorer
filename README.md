@@ -76,7 +76,7 @@ catkin_make install
 
 ### 4. Download pre-trained models
 
-The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git).
+The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer.git/neuro_explorer_train).
 
 
 ## Exploring WGx3 world  

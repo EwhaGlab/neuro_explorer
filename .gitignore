@@ -17,3 +17,13 @@
 .settings
 .cproject
 /Debug/
+
+
+#pycharm setting
+
+neuro_explorer_train/.idea
+
+#pycache
+neuro_explorer_train/utils/__pycache__
+neuro_explorer_train/examples/__pycache__
+neuro_explorer_train/common/__pycache__

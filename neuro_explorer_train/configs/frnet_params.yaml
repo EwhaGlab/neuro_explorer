@@ -1,0 +1,25 @@
+data_configs:
+    dataset_dir: '/home/hankm/data/neuro_globalplan/train_dataset/data4/processed_data'
+    gmheight: 480
+    gmwidth: 480
+    gmheight_p: 512
+    gmwidth_p: 512
+    pad_size: 16
+    maplens: [400,400,400,400,400,480] # map sizes (height = width) for all images in explore bench dataset
+    num_rounds: 100
+    metalen: 18
+    worlds: ['loop', 'room_with_corner', 'room', 'corner', 'corridor', 'loop_with_corridor']
+
+network_configs:
+    input_channels: 1
+    output_channels: 1  # num classes
+    batch_size: 32
+    num_filters: 4 #8 # 16 for multi-labels
+    batch_norm: False
+    
+training_configs:
+    num_epochs: 12
+    loss_fn: 'binary_crossentropy'
+    outmodelfile: '/home/hankm/results/neuro_globalplan_res/fr_detection/model_1'  # batch norm
+    outhistfile:  '/home/hankm/results/neuro_globalplan_res/fr_detection/train_history_dict_model_1'
+    
