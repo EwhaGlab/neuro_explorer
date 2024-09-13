@@ -15,7 +15,7 @@ If you want to run this package in a synthetic environment, such as the Gazebo s
 Besides, we found [TEB](https://github.com/rst-tu-dortmund/teb_local_planner) local planner runs nicely with this package, so we recommend you to install this local planner.
 In the case of solving real-world exploration problems with a mobile robot, you will need a SLAM SW to produce a 2D occupancy grid map. We recommend installing [SLAM toolbox](https://github.com/SteveMacenski/slam_toolbox) for your localization and mapping.
 
-**neuro_explorer** deploys pre-trained network models in a [TensorFlow](https://www.tensorflow.org/install?hl=ko) environment. Refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git) to see how to install tensorflow and its dependencies for re-training the network models.
+**neuro_explorer** deploys pre-trained network models in a [TensorFlow](https://www.tensorflow.org/install?hl=ko) environment. Refer to [neuro_explorer_train](./neuro_explorer_train/README.md) to see how to install tensorflow and its dependencies for re-training the network models.
 To deploy the trained models in the C++ project, we utilize [TensorFlow C API library](https://www.tensorflow.org/install/lang_c). Make sure to install this package prior to install our package.
 
 ## To install
@@ -23,7 +23,7 @@ To deploy the trained models in the C++ project, we utilize [TensorFlow C API li
 ### 1. Go over the following steps for installing TensorFlow related packages
 
 
-(1) Install [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer_train.git)
+(1) Install [neuro_explorer_train](./neuro_explorer_train/README.md)
 
 (2) Install [TensorFlow C API library](https://www.tensorflow.org/install/lang_c)'s instruction
 
@@ -76,7 +76,7 @@ catkin_make install
 
 ### 4. Download pre-trained models
 
-The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](https://github.com/han-kyung-min/neuro_explorer.git/neuro_explorer_train).
+The pre-trained models are available at [*this link*](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download them and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](./neuro_explorer_train/README.md).
 
 
 ## Exploring WGx3 world  
