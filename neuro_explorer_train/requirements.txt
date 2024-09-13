@@ -115,6 +115,7 @@ python-qt-binding==0.4.4
 pytz==2023.3
 PyYAML==6.0
 pyzmq==25.1.0
+rospkg==1.5.1
 referencing==0.29.1
 requests==2.31.0
 requests-oauthlib==1.3.1

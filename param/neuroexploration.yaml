@@ -1,6 +1,6 @@
-
+#base_dir: /home/hankm/catkin_ws/src/neuro_explorer
 neuroexplorer:
-    debug_data_save_path:   '/home/hankm/results/neuro_exploration_res'
+    debug_data_save_path:   '/home/hankm/results/neuro_exploration_res' # path generates some log files
     ne_report_file:         'ne_report.txt'
     savemap_at_the_end:     true
     costmap_conf_thr:       0.4 # (0.4 for willowgarage, 0.8 for small worlds) # 0.4 (fetch)   # the higher the more strict.==> thorough exploration, go lower for faster exploration. untolerates any neighboring obstacle point   
@@ -18,10 +18,12 @@ neuroexplorer:
     lambda:                 0.3     # weight for A*Net (1-lambda) goes to VizNet
     max_exploration_time:   7200     # 3600 for WG, 7200 for WGx2, and 14400 for WGx3
 tf_loader:
-    fd_model_filepath:      '/home/hankm/catkin_ws/src/neuro_explorer/nn_models/fr_net/base_model' # 8 filter
-    astar_model_filepath:   '/home/hankm/catkin_ws/src/neuro_explorer/nn_models/astar_net/base_model'
-    covrew_model_filepath:  '/home/hankm/catkin_ws/src/neuro_explorer/nn_models/viz_net/base_model'
-    #covrew_model_filepath:  '/home/hankm/results/neuro_globalplan_res/coverage_estimator/base_model'
+    #fd_model_filepath:      !join [*base_dir, nn_models/fr_net/base_model] # 8 filter
+    #astar_model_filepath:   !join [*base_dir, nn_models/astar_net/base_model]
+    #covrew_model_filepath:  !join [*base_dir, nn_models/viz_net/base_model]
+    fd_model_filepath:      /home/hankm/catkin_ws/src/neuro_explorer/nn_models/fr_net/base_model # 8 filter
+    astar_model_filepath:   /home/hankm/catkin_ws/src/neuro_explorer/nn_models/astar_net/base_model
+    covrew_model_filepath:  /home/hankm/catkin_ws/src/neuro_explorer/nn_models/viz_net/base_model
     cnn_height:             512
     cnn_width:              512
     num_classes:            8
