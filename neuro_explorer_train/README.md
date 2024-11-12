@@ -8,7 +8,7 @@ This package was developed in a Conda environment on Ubuntu 20.04, using the spe
 [Miniconda](https://docs.anaconda.com/miniconda/)
 [CUDA: 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive)
 [CUDNN: v8.9.2](https://developer.nvidia.com/rdp/cudnn-archive)
-[Tensorflow 12.2](https://www.tensorflow.org/install/pip)
+[Tensorflow 2.12](https://www.tensorflow.org/install/pip)
 
 ## Prerequisite
 You should have cloned the main [**Neuro-Explorer**](../) package before proceeding with the following steps.

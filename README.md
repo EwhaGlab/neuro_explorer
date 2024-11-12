@@ -20,7 +20,7 @@ Besides, we found [TEB](https://github.com/rst-tu-dortmund/teb_local_planner) lo
 In the case of solving real-world exploration problems with a mobile robot, you will need a SLAM SW to produce a 2D occupancy grid map. We recommend installing [SLAM toolbox](https://github.com/SteveMacenski/slam_toolbox) for your localization and mapping.
 
 **neuro_explorer** deploys pre-trained network models trained in a [TensorFlow](https://www.tensorflow.org/install?hl=ko) environment. Refer to [neuro_explorer_train](./neuro_explorer_train/README.md) to see how to install tensorflow and its dependencies for re-training the network models.
-To integrate the trained models into the C++ project, we utilize the [TensorFlow C API library](https://www.tensorflow.org/install/lang_c). Ensure this package is installed before installing our package.
+To integrate the trained models into the C++ project, we utilize the [TensorFlow C API library (v2.12)](https://www.tensorflow.org/install/lang_c). Ensure this package is installed before installing our package.
 
 ## To install
 
@@ -33,7 +33,7 @@ To integrate the trained models into the C++ project, we utilize the [TensorFlow
 ```
 > #### (2) Install [neuro_explorer_train](./neuro_explorer_train/README.md) 
 
-> #### (3) Install [TensorFlow C API library](https://www.tensorflow.org/install/lang_c) based on its instruction
+> #### (3) Install [TensorFlow C API library (v2.12)](https://www.tensorflow.org/install/lang_c) based on its instruction
 
 ### 2. Install the required ROS navigation packages
 
