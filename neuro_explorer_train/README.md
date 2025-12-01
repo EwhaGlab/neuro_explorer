@@ -25,7 +25,7 @@ pip install -r requirements.txt
 
 ## Download the dataset
 
-> The training dataset is available in [this folder](https://iewha-my.sharepoint.com/:u:/g/personal/hankm_i_ewha_ac_kr/IQDe9j5WFzNuQLoT6Oc-ldv3AVEoHPmb65lH8HE9pwG2E_E?e=aZUfpk)
+> The training dataset is available in [this folder](https://www.dropbox.com/scl/fi/vl2hvrbp26rb430bzgfl3/ne_dataset.zip?rlkey=sdin0sxwqynjczfljqeaymt5m&st=6p9iuhso&dl=0)
 Unzip this file and place it under your data directory. Then, make sure to have `data_dir` in config files points to your data directory. The config files are located in `<base_dir>/neuro_explorer_train/config/`
 
 ## To train models
