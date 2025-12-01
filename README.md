@@ -92,7 +92,7 @@ To integrate the trained models into the C++ project, we utilize the [TensorFlow
 
 ### 4. Download pre-trained models
 
-> The pre-trained models are available at [**THIS LINK**](https://drive.google.com/drive/folders/1mXkKHI6-BrAemQjoGyCWZyQMnNZOVVh9?usp=sharing). Download and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](./neuro_explorer_train/README.md).
+> The pre-trained models are available at [**THIS LINK**](https://iewha-my.sharepoint.com/:f:/g/personal/hankm_i_ewha_ac_kr/IgD5rxKJnbpPQJ9fiko_eY2AAasxfjj2kYqSU85MzKnmq7Q?e=X404da). Download and place them in `~/catkin_ws/src/neuro_explorer/nn_models/`. While the pre-trained models are sufficient to explore a large space such as WGx3, you have the option to retrain the model. For the retraining procedure, refer to [neuro_explorer_train](./neuro_explorer_train/README.md).
 
 
 ## Exploring WGx3 world  
